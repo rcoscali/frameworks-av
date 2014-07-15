@@ -103,7 +103,7 @@ private:
 
     ssize_t mPrevBandwidthIndex;
     int64_t mLastPlaylistFetchTimeUs;
-    sp<M3UParser> mPlaylist;
+    sp<MPDParser> mMpd;
     int32_t mSeqNumber;
     int64_t mSeekTimeUs;
     int32_t mNumRetries;
@@ -126,7 +126,7 @@ private:
     };
     RefreshState mRefreshState;
 
-    uint8_t mPlaylistHash[16];
+    uint8_t mMpdHash[16];
 
     void onConnect(const sp<AMessage> &msg);
     void onDisconnect();

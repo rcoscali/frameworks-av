@@ -54,7 +54,7 @@ namespace android {
 				       ? HTTPBase::kFlagIncognito
 				       : 0)),
       mPrevBandwidthIndex(-1),
-      mLastPlaylistFetchTimeUs(-1),
+      mLastMpdFetchTimeUs(-1),
       mSeqNumber(-1),
       mSeekTimeUs(-1),
       mNumRetries(0),
@@ -180,26 +180,27 @@ namespace android {
       headers = NULL;
     }
 
-    ALOGI("onConnect <URL suppressed>");
+    //ALOGI("onConnect <URL suppressed>");
+    ALOGI("onConnect %s", url.c_str());
 
     mMasterURL = url;
 
     bool dummy;
-    sp<MPDParser> presDescriptor = fetchPresDescriptor(url.c_str(), &dummy);
+    sp<MPDParser> mpd = fetchMpd(url.c_str(), &dummy);
 
-    if (presDescriptor == NULL) {
+    if (mpd == NULL) {
       ALOGE("unable to fetch manifest '%s'.", url.c_str());
 
       signalEOS(ERROR_IO);
       return;
     }
 
-    if (presDescriptor->isDynamic()) {
-      for (size_t i = 0; i < presDescriptor->size(); ++i) {
+    if (mpd->isDynamic()) {
+      for (size_t i = 0; i < mpd->size(); ++i) {
 	BandwidthItem item;
 
 	sp<AMessage> meta;
-	presDescriptor->itemAt(i, &item.mURI, &meta);
+	mpd->itemAt(i, &item.mURI, &meta);
 
 	unsigned long bandwidth;
 	CHECK(meta->findInt32("bandwidth", (int32_t *)&item.mBandwidth));
@@ -316,8 +317,8 @@ namespace android {
     return OK;
   }
 
-  sp<M3UParser> DashSession::fetchPlaylist(const char *url, bool *unchanged) {
-    ALOGV("fetchPlaylist '%s'", url);
+  sp<MPDParser> DashSession::fetchMpd(const char *url, bool *unchanged) {
+    ALOGV("fetchMpd '%s'", url);
 
     *unchanged = false;
 
@@ -340,7 +341,7 @@ namespace android {
 
     MD5_Final(hash, &m);
 
-    if (mPlaylist != NULL && !memcmp(hash, mPlaylistHash, 16)) {
+    if (mMpd != NULL && !memcmp(hash, mMpdHash, 16)) {
       // playlist unchanged
 
       if (mRefreshState != THIRD_UNCHANGED_RELOAD_ATTEMPT) {
@@ -349,22 +350,22 @@ namespace android {
 
       *unchanged = true;
 
-      ALOGV("Playlist unchanged, refresh state is now %d",
+      ALOGV("Mpd unchanged, refresh state is now %d",
 	    (int)mRefreshState);
 
       return NULL;
     }
 
-    memcpy(mPlaylistHash, hash, sizeof(hash));
+    memcpy(mMpdHash, hash, sizeof(hash));
 
     mRefreshState = INITIAL_MINIMUM_RELOAD_DELAY;
 #endif
 
-    sp<M3UParser> playlist =
-      new M3UParser(url, buffer->data(), buffer->size());
+    sp<MPDParser> mpd =
+      new MPDParser(url, buffer->data(), buffer->size());
 
     if (playlist->initCheck() != OK) {
-      ALOGE("failed to parse .m3u8 playlist");
+      ALOGE("failed to parse media presentation descriptor");
 
       return NULL;
     }
@@ -373,25 +374,25 @@ namespace android {
   }
 
   int64_t DashSession::getSegmentStartTimeUs(int32_t seqNumber) const {
-    CHECK(mPlaylist != NULL);
+    CHECK(mMpd != NULL);
 
-    int32_t firstSeqNumberInPlaylist;
-    if (mPlaylist->meta() == NULL || !mPlaylist->meta()->findInt32(
-								   "media-sequence", &firstSeqNumberInPlaylist)) {
-      firstSeqNumberInPlaylist = 0;
+    int32_t firstSeqNumberInMpd;
+    if (mMpd->meta() == NULL || !mMpd->meta()->findInt32(
+								   "media-sequence", &firstSeqNumberInMpd)) {
+      firstSeqNumberInMpd = 0;
     }
 
-    int32_t lastSeqNumberInPlaylist =
-      firstSeqNumberInPlaylist + (int32_t)mPlaylist->size() - 1;
+    int32_t lastSeqNumberInMpd =
+      firstSeqNumberInMpd + (int32_t)mMpd->size() - 1;
 
-    CHECK_GE(seqNumber, firstSeqNumberInPlaylist);
-    CHECK_LE(seqNumber, lastSeqNumberInPlaylist);
+    CHECK_GE(seqNumber, firstSeqNumberInMpd);
+    CHECK_LE(seqNumber, lastSeqNumberInMpd);
 
     int64_t segmentStartUs = 0ll;
     for (int32_t index = 0;
-	 index < seqNumber - firstSeqNumberInPlaylist; ++index) {
+	 index < seqNumber - firstSeqNumberInMpd; ++index) {
       sp<AMessage> itemMeta;
-      CHECK(mPlaylist->itemAt(
+      CHECK(mMpd->itemAt(
 			      index, NULL /* uri */, &itemMeta));
 
       int64_t itemDurationUs;
@@ -478,31 +479,31 @@ namespace android {
     return index;
   }
 
-  bool DashSession::timeToRefreshPlaylist(int64_t nowUs) const {
-    if (mPlaylist == NULL) {
+  bool DashSession::timeToRefreshMpd(int64_t nowUs) const {
+    if (mMpd == NULL) {
       CHECK_EQ((int)mRefreshState, (int)INITIAL_MINIMUM_RELOAD_DELAY);
       return true;
     }
 
     int32_t targetDurationSecs;
-    CHECK(mPlaylist->meta()->findInt32("target-duration", &targetDurationSecs));
+    CHECK(mMpd->meta()->findInt32("target-duration", &targetDurationSecs));
 
     int64_t targetDurationUs = targetDurationSecs * 1000000ll;
 
-    int64_t minPlaylistAgeUs;
+    int64_t minMpdAgeUs;
 
     switch (mRefreshState) {
     case INITIAL_MINIMUM_RELOAD_DELAY:
       {
-	size_t n = mPlaylist->size();
+	size_t n = mMpd->size();
 	if (n > 0) {
 	  sp<AMessage> itemMeta;
-	  CHECK(mPlaylist->itemAt(n - 1, NULL /* uri */, &itemMeta));
+	  CHECK(mMpd->itemAt(n - 1, NULL /* uri */, &itemMeta));
 
 	  int64_t itemDurationUs;
 	  CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
 
-	  minPlaylistAgeUs = itemDurationUs;
+	  minMpdAgeUs = itemDurationUs;
 	  break;
 	}
 
@@ -511,19 +512,19 @@ namespace android {
 
     case FIRST_UNCHANGED_RELOAD_ATTEMPT:
       {
-	minPlaylistAgeUs = targetDurationUs / 2;
+	minMpdAgeUs = targetDurationUs / 2;
 	break;
       }
 
     case SECOND_UNCHANGED_RELOAD_ATTEMPT:
       {
-	minPlaylistAgeUs = (targetDurationUs * 3) / 2;
+	minMpdAgeUs = (targetDurationUs * 3) / 2;
 	break;
       }
 
     case THIRD_UNCHANGED_RELOAD_ATTEMPT:
       {
-	minPlaylistAgeUs = targetDurationUs * 3;
+	minMpdAgeUs = targetDurationUs * 3;
 	break;
       }
 
@@ -532,7 +533,7 @@ namespace android {
       break;
     }
 
-    return mLastPlaylistFetchTimeUs + minPlaylistAgeUs <= nowUs;
+    return mLastMpdFetchTimeUs + minMpdAgeUs <= nowUs;
   }
 
   void DashSession::onDownloadNext() {
@@ -541,9 +542,9 @@ namespace android {
   rinse_repeat:
     int64_t nowUs = ALooper::GetNowUs();
 
-    if (mLastPlaylistFetchTimeUs < 0
+    if (mLastMpdFetchTimeUs < 0
 	|| (ssize_t)bandwidthIndex != mPrevBandwidthIndex
-	|| (!mPlaylist->isComplete() && timeToRefreshPlaylist(nowUs))) {
+	|| (!mMpd->isComplete() && timeToRefreshMpd(nowUs))) {
       AString url;
       if (mBandwidthItems.size() > 0) {
 	url = mBandwidthItems.editItemAt(bandwidthIndex).mURI;
@@ -554,11 +555,11 @@ namespace android {
       if ((ssize_t)bandwidthIndex != mPrevBandwidthIndex) {
 	// If we switch bandwidths, do not pay any heed to whether
 	// playlists changed since the last time...
-	mPlaylist.clear();
+	mMpd.clear();
       }
 
       bool unchanged;
-      sp<M3UParser> playlist = fetchPlaylist(url.c_str(), &unchanged);
+      sp<MPDParser> playlist = fetchMpd(url.c_str(), &unchanged);
       if (playlist == NULL) {
 	if (unchanged) {
 	  // We succeeded in fetching the playlist, but it was
@@ -570,20 +571,20 @@ namespace android {
 	  return;
 	}
       } else {
-	mPlaylist = playlist;
+	mMpd = playlist;
       }
 
       if (!mDurationFixed) {
 	Mutex::Autolock autoLock(mLock);
 
-	if (!mPlaylist->isComplete() && !mPlaylist->isEvent()) {
+	if (!mMpd->isComplete() && !mMpd->isEvent()) {
 	  mDurationUs = -1;
 	  mDurationFixed = true;
 	} else {
 	  mDurationUs = 0;
-	  for (size_t i = 0; i < mPlaylist->size(); ++i) {
+	  for (size_t i = 0; i < mMpd->size(); ++i) {
 	    sp<AMessage> itemMeta;
-	    CHECK(mPlaylist->itemAt(
+	    CHECK(mMpd->itemAt(
 				    i, NULL /* uri */, &itemMeta));
 
 	    int64_t itemDurationUs;
@@ -592,17 +593,17 @@ namespace android {
 	    mDurationUs += itemDurationUs;
 	  }
 
-	  mDurationFixed = mPlaylist->isComplete();
+	  mDurationFixed = mMpd->isComplete();
 	}
       }
 
-      mLastPlaylistFetchTimeUs = ALooper::GetNowUs();
+      mLastMpdFetchTimeUs = ALooper::GetNowUs();
     }
 
-    int32_t firstSeqNumberInPlaylist;
-    if (mPlaylist->meta() == NULL || !mPlaylist->meta()->findInt32(
-								   "media-sequence", &firstSeqNumberInPlaylist)) {
-      firstSeqNumberInPlaylist = 0;
+    int32_t firstSeqNumberInMpd;
+    if (mMpd->meta() == NULL || !mMpd->meta()->findInt32(
+								   "media-sequence", &firstSeqNumberInMpd)) {
+      firstSeqNumberInMpd = 0;
     }
 
     bool seekDiscontinuity = false;
@@ -610,12 +611,12 @@ namespace android {
     bool bandwidthChanged = false;
 
     if (mSeekTimeUs >= 0) {
-      if (mPlaylist->isComplete() || mPlaylist->isEvent()) {
+      if (mMpd->isComplete() || mMpd->isEvent()) {
 	size_t index = 0;
 	int64_t segmentStartUs = 0;
-	while (index < mPlaylist->size()) {
+	while (index < mMpd->size()) {
 	  sp<AMessage> itemMeta;
-	  CHECK(mPlaylist->itemAt(
+	  CHECK(mMpd->itemAt(
 				  index, NULL /* uri */, &itemMeta));
 
 	  int64_t itemDurationUs;
@@ -629,8 +630,8 @@ namespace android {
 	  ++index;
 	}
 
-	if (index < mPlaylist->size()) {
-	  int32_t newSeqNumber = firstSeqNumberInPlaylist + index;
+	if (index < mMpd->size()) {
+	  int32_t newSeqNumber = firstSeqNumberInMpd + index;
 
 	  ALOGI("seeking to seq no %d", newSeqNumber);
 
@@ -656,39 +657,39 @@ namespace android {
       mCondition.broadcast();
     }
 
-    const int32_t lastSeqNumberInPlaylist =
-      firstSeqNumberInPlaylist + (int32_t)mPlaylist->size() - 1;
+    const int32_t lastSeqNumberInMpd =
+      firstSeqNumberInMpd + (int32_t)mMpd->size() - 1;
 
     if (mSeqNumber < 0) {
-      if (mPlaylist->isComplete()) {
-	mSeqNumber = firstSeqNumberInPlaylist;
+      if (mMpd->isComplete()) {
+	mSeqNumber = firstSeqNumberInMpd;
       } else {
 	// If this is a live session, start 3 segments from the end.
-	mSeqNumber = lastSeqNumberInPlaylist - 3;
-	if (mSeqNumber < firstSeqNumberInPlaylist) {
-	  mSeqNumber = firstSeqNumberInPlaylist;
+	mSeqNumber = lastSeqNumberInMpd - 3;
+	if (mSeqNumber < firstSeqNumberInMpd) {
+	  mSeqNumber = firstSeqNumberInMpd;
 	}
       }
     }
 
-    if (mSeqNumber < firstSeqNumberInPlaylist
-	|| mSeqNumber > lastSeqNumberInPlaylist) {
+    if (mSeqNumber < firstSeqNumberInMpd
+	|| mSeqNumber > lastSeqNumberInMpd) {
       if (mPrevBandwidthIndex != (ssize_t)bandwidthIndex) {
 	// Go back to the previous bandwidth.
 
 	ALOGI("new bandwidth does not have the sequence number "
 	      "we're looking for, switching back to previous bandwidth");
 
-	mLastPlaylistFetchTimeUs = -1;
+	mLastMpdFetchTimeUs = -1;
 	bandwidthIndex = mPrevBandwidthIndex;
 	goto rinse_repeat;
       }
 
-      if (!mPlaylist->isComplete() && mNumRetries < kMaxNumRetries) {
+      if (!mMpd->isComplete() && mNumRetries < kMaxNumRetries) {
 	++mNumRetries;
 
-	if (mSeqNumber > lastSeqNumberInPlaylist) {
-	  mLastPlaylistFetchTimeUs = -1;
+	if (mSeqNumber > lastSeqNumberInMpd) {
+	  mLastMpdFetchTimeUs = -1;
 	  postMonitorQueue(3000000ll);
 	  return;
 	}
@@ -697,15 +698,15 @@ namespace android {
 	// number available and signal a discontinuity.
 
 	ALOGI("We've missed the boat, restarting playback.");
-	mSeqNumber = lastSeqNumberInPlaylist;
+	mSeqNumber = lastSeqNumberInMpd;
 	explicitDiscontinuity = true;
 
 	// fall through
       } else {
 	ALOGE("Cannot find sequence number %d in playlist "
 	      "(contains %d - %d)",
-	      mSeqNumber, firstSeqNumberInPlaylist,
-	      firstSeqNumberInPlaylist + mPlaylist->size() - 1);
+	      mSeqNumber, firstSeqNumberInMpd,
+	      firstSeqNumberInMpd + mMpd->size() - 1);
 
 	signalEOS(ERROR_END_OF_STREAM);
 	return;
@@ -716,8 +717,8 @@ namespace android {
 
     AString uri;
     sp<AMessage> itemMeta;
-    CHECK(mPlaylist->itemAt(
-			    mSeqNumber - firstSeqNumberInPlaylist,
+    CHECK(mMpd->itemAt(
+			    mSeqNumber - firstSeqNumberInMpd,
 			    &uri,
 			    &itemMeta));
 
@@ -734,7 +735,7 @@ namespace android {
     }
 
     ALOGV("fetching segment %d from (%d .. %d)",
-          mSeqNumber, firstSeqNumberInPlaylist, lastSeqNumberInPlaylist);
+          mSeqNumber, firstSeqNumberInMpd, lastSeqNumberInMpd);
 
     sp<ABuffer> buffer;
     status_t err = fetchFile(uri.c_str(), &buffer, range_offset, range_length);
@@ -746,7 +747,7 @@ namespace android {
 
     CHECK(buffer != NULL);
 
-    err = decryptBuffer(mSeqNumber - firstSeqNumberInPlaylist, buffer);
+    err = decryptBuffer(mSeqNumber - firstSeqNumberInMpd, buffer);
 
     if (err != OK) {
       ALOGE("decryptBuffer failed w/ error %d", err);
@@ -769,7 +770,7 @@ namespace android {
 
       ALOGI("Retrying with a different bandwidth stream.");
 
-      mLastPlaylistFetchTimeUs = -1;
+      mLastMpdFetchTimeUs = -1;
       bandwidthIndex = getBandwidthIndex();
       mPrevBandwidthIndex = bandwidthIndex;
       mSeqNumber = -1;
@@ -804,7 +805,7 @@ namespace android {
       // signal a 'hard' discontinuity for explicit or bandwidthChanged.
       uint8_t type = (explicitDiscontinuity || bandwidthChanged) ? 1 : 0;
 
-      if (mPlaylist->isComplete() || mPlaylist->isEvent()) {
+      if (mMpd->isComplete() || mMpd->isEvent()) {
 	// If this was a live event this made no sense since
 	// we don't have access to all the segment before the current
 	// one.
@@ -867,144 +868,147 @@ namespace android {
     }
   }
 
-  status_t DashSession::decryptBuffer(
-				      size_t playlistIndex, const sp<ABuffer> &buffer) {
-    sp<AMessage> itemMeta;
-    bool found = false;
-    AString method;
+  /*
+   *
+   */
+  status_t DashSession::decryptBuffer(size_t playlistIndex, const sp<ABuffer> &buffer) 
+  {
+    // sp<AMessage> itemMeta;
+    // bool found = false;
+    // AString method;
 
-    for (ssize_t i = playlistIndex; i >= 0; --i) {
-      AString uri;
-      CHECK(mPlaylist->itemAt(i, &uri, &itemMeta));
+    // for (ssize_t i = playlistIndex; i >= 0; --i) {
+    //   AString uri;
+    //   CHECK(mMpd->itemAt(i, &uri, &itemMeta));
 
-      if (itemMeta->findString("cipher-method", &method)) {
-	found = true;
-	break;
-      }
-    }
+    //   if (itemMeta->findString("cipher-method", &method)) {
+    // 	found = true;
+    // 	break;
+    //   }
+    // }
 
-    if (!found) {
-      method = "NONE";
-    }
+    // if (!found) {
+    //   method = "NONE";
+    // }
 
-    if (method == "NONE") {
-      return OK;
-    } else if (!(method == "AES-128")) {
-      ALOGE("Unsupported cipher method '%s'", method.c_str());
-      return ERROR_UNSUPPORTED;
-    }
+    // if (method == "NONE") {
+    //   return OK;
+    // } else if (!(method == "AES-128")) {
+    //   ALOGE("Unsupported cipher method '%s'", method.c_str());
+    //   return ERROR_UNSUPPORTED;
+    // }
 
-    AString keyURI;
-    if (!itemMeta->findString("cipher-uri", &keyURI)) {
-      ALOGE("Missing key uri");
-      return ERROR_MALFORMED;
-    }
+    // AString keyURI;
+    // if (!itemMeta->findString("cipher-uri", &keyURI)) {
+    //   ALOGE("Missing key uri");
+    //   return ERROR_MALFORMED;
+    // }
 
-    ssize_t index = mAESKeyForURI.indexOfKey(keyURI);
+    // ssize_t index = mAESKeyForURI.indexOfKey(keyURI);
 
-    sp<ABuffer> key;
-    if (index >= 0) {
-      key = mAESKeyForURI.valueAt(index);
-    } else {
-      key = new ABuffer(16);
+    // sp<ABuffer> key;
+    // if (index >= 0) {
+    //   key = mAESKeyForURI.valueAt(index);
+    // } else {
+    //   key = new ABuffer(16);
 
-      sp<HTTPBase> keySource =
-	HTTPBase::Create(
-			 (mFlags & kFlagIncognito)
-			 ? HTTPBase::kFlagIncognito
-			 : 0);
+    //   sp<HTTPBase> keySource =
+    // 	HTTPBase::Create(
+    // 			 (mFlags & kFlagIncognito)
+    // 			 ? HTTPBase::kFlagIncognito
+    // 			 : 0);
 
-      if (mUIDValid) {
-	keySource->setUID(mUID);
-      }
+    //   if (mUIDValid) {
+    // 	keySource->setUID(mUID);
+    //   }
 
-      status_t err =
-	keySource->connect(
-			   keyURI.c_str(),
-			   mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
+    //   status_t err =
+    // 	keySource->connect(
+    // 			   keyURI.c_str(),
+    // 			   mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
 
-      if (err == OK) {
-	size_t offset = 0;
-	while (offset < 16) {
-	  ssize_t n = keySource->readAt(
-					offset, key->data() + offset, 16 - offset);
-	  if (n <= 0) {
-	    err = ERROR_IO;
-	    break;
-	  }
+    //   if (err == OK) {
+    // 	size_t offset = 0;
+    // 	while (offset < 16) {
+    // 	  ssize_t n = keySource->readAt(
+    // 					offset, key->data() + offset, 16 - offset);
+    // 	  if (n <= 0) {
+    // 	    err = ERROR_IO;
+    // 	    break;
+    // 	  }
 
-	  offset += n;
-	}
-      }
+    // 	  offset += n;
+    // 	}
+    //   }
 
-      if (err != OK) {
-	ALOGE("failed to fetch cipher key from '%s'.", keyURI.c_str());
-	return ERROR_IO;
-      }
+    //   if (err != OK) {
+    // 	ALOGE("failed to fetch cipher key from '%s'.", keyURI.c_str());
+    // 	return ERROR_IO;
+    //   }
 
-      mAESKeyForURI.add(keyURI, key);
-    }
+    //   mAESKeyForURI.add(keyURI, key);
+    // }
 
-    AES_KEY aes_key;
-    if (AES_set_decrypt_key(key->data(), 128, &aes_key) != 0) {
-      ALOGE("failed to set AES decryption key.");
-      return UNKNOWN_ERROR;
-    }
+    // AES_KEY aes_key;
+    // if (AES_set_decrypt_key(key->data(), 128, &aes_key) != 0) {
+    //   ALOGE("failed to set AES decryption key.");
+    //   return UNKNOWN_ERROR;
+    // }
 
-    unsigned char aes_ivec[16];
+    // unsigned char aes_ivec[16];
 
-    AString iv;
-    if (itemMeta->findString("cipher-iv", &iv)) {
-      if ((!iv.startsWith("0x") && !iv.startsWith("0X"))
-	  || iv.size() != 16 * 2 + 2) {
-	ALOGE("malformed cipher IV '%s'.", iv.c_str());
-	return ERROR_MALFORMED;
-      }
+    // AString iv;
+    // if (itemMeta->findString("cipher-iv", &iv)) {
+    //   if ((!iv.startsWith("0x") && !iv.startsWith("0X"))
+    // 	  || iv.size() != 16 * 2 + 2) {
+    // 	ALOGE("malformed cipher IV '%s'.", iv.c_str());
+    // 	return ERROR_MALFORMED;
+    //   }
 
-      memset(aes_ivec, 0, sizeof(aes_ivec));
-      for (size_t i = 0; i < 16; ++i) {
-	char c1 = tolower(iv.c_str()[2 + 2 * i]);
-	char c2 = tolower(iv.c_str()[3 + 2 * i]);
-	if (!isxdigit(c1) || !isxdigit(c2)) {
-	  ALOGE("malformed cipher IV '%s'.", iv.c_str());
-	  return ERROR_MALFORMED;
-	}
-	uint8_t nibble1 = isdigit(c1) ? c1 - '0' : c1 - 'a' + 10;
-	uint8_t nibble2 = isdigit(c2) ? c2 - '0' : c2 - 'a' + 10;
+    //   memset(aes_ivec, 0, sizeof(aes_ivec));
+    //   for (size_t i = 0; i < 16; ++i) {
+    // 	char c1 = tolower(iv.c_str()[2 + 2 * i]);
+    // 	char c2 = tolower(iv.c_str()[3 + 2 * i]);
+    // 	if (!isxdigit(c1) || !isxdigit(c2)) {
+    // 	  ALOGE("malformed cipher IV '%s'.", iv.c_str());
+    // 	  return ERROR_MALFORMED;
+    // 	}
+    // 	uint8_t nibble1 = isdigit(c1) ? c1 - '0' : c1 - 'a' + 10;
+    // 	uint8_t nibble2 = isdigit(c2) ? c2 - '0' : c2 - 'a' + 10;
 
-	aes_ivec[i] = nibble1 << 4 | nibble2;
-      }
-    } else {
-      memset(aes_ivec, 0, sizeof(aes_ivec));
-      aes_ivec[15] = mSeqNumber & 0xff;
-      aes_ivec[14] = (mSeqNumber >> 8) & 0xff;
-      aes_ivec[13] = (mSeqNumber >> 16) & 0xff;
-      aes_ivec[12] = (mSeqNumber >> 24) & 0xff;
-    }
+    // 	aes_ivec[i] = nibble1 << 4 | nibble2;
+    //   }
+    // } else {
+    //   memset(aes_ivec, 0, sizeof(aes_ivec));
+    //   aes_ivec[15] = mSeqNumber & 0xff;
+    //   aes_ivec[14] = (mSeqNumber >> 8) & 0xff;
+    //   aes_ivec[13] = (mSeqNumber >> 16) & 0xff;
+    //   aes_ivec[12] = (mSeqNumber >> 24) & 0xff;
+    // }
 
-    AES_cbc_encrypt(
-		    buffer->data(), buffer->data(), buffer->size(),
-		    &aes_key, aes_ivec, AES_DECRYPT);
+    // AES_cbc_encrypt(
+    // 		    buffer->data(), buffer->data(), buffer->size(),
+    // 		    &aes_key, aes_ivec, AES_DECRYPT);
 
-    // hexdump(buffer->data(), buffer->size());
+    // // hexdump(buffer->data(), buffer->size());
 
-    size_t n = buffer->size();
-    CHECK_GT(n, 0u);
+    // size_t n = buffer->size();
+    // CHECK_GT(n, 0u);
 
-    size_t pad = buffer->data()[n - 1];
+    // size_t pad = buffer->data()[n - 1];
 
-    CHECK_GT(pad, 0u);
-    CHECK_LE(pad, 16u);
-    CHECK_GE((size_t)n, pad);
-    for (size_t i = 0; i < pad; ++i) {
-      CHECK_EQ((unsigned)buffer->data()[n - 1 - i], pad);
-    }
+    // CHECK_GT(pad, 0u);
+    // CHECK_LE(pad, 16u);
+    // CHECK_GE((size_t)n, pad);
+    // for (size_t i = 0; i < pad; ++i) {
+    //   CHECK_EQ((unsigned)buffer->data()[n - 1 - i], pad);
+    // }
 
-    n -= pad;
+    // n -= pad;
 
-    buffer->setRange(buffer->offset(), n);
+    // buffer->setRange(buffer->offset(), n);
 
-    return OK;
+    // return OK;
   }
 
   void DashSession::postMonitorQueue(int64_t delayUs) {
