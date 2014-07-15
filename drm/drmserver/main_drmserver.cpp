@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "drmserver"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
@@ -28,11 +28,13 @@ using namespace android;
 
 int main(int argc, char** argv)
 {
-    sp<ProcessState> proc(ProcessState::self());
-    sp<IServiceManager> sm = defaultServiceManager();
-    ALOGV("ServiceManager: %p", sm.get());
-    DrmManagerService::instantiate();
-    ProcessState::self()->startThreadPool();
-    IPCThreadState::self()->joinThreadPool();
+  sp<ProcessState> proc(ProcessState::self());
+  sp<IServiceManager> sm = defaultServiceManager();
+  ALOGI("drmserver::main - ServiceManager: %p", sm.get());
+  DrmManagerService::instantiate();
+  ProcessState::self()->startThreadPool();
+  ALOGI("drmserver::main - Started");
+  IPCThreadState::self()->joinThreadPool();
+  ALOGI("drmserver::main - Terminated");
 }
 
