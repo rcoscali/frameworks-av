@@ -174,6 +174,7 @@ LOCAL_STATIC_LIBRARIES := \
         libvpx \
         libwebm \
         libstagefright_mpeg2ts \
+        libstagefright_dash \
         libstagefright_httplive \
         libstagefright_id3 \
         libFLAC \

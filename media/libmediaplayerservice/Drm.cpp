@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "Drm"
 #include <utils/Log.h>
 
@@ -31,99 +31,107 @@
 
 namespace android {
 
-KeyedVector<Vector<uint8_t>, String8> Drm::mUUIDToLibraryPathMap;
-KeyedVector<String8, wp<SharedLibrary> > Drm::mLibraryPathToOpenLibraryMap;
-Mutex Drm::mMapLock;
+  KeyedVector<Vector<uint8_t>, String8> Drm::mUUIDToLibraryPathMap;
+  KeyedVector<String8, wp<SharedLibrary> > Drm::mLibraryPathToOpenLibraryMap;
+  Mutex Drm::mMapLock;
 
-static bool operator<(const Vector<uint8_t> &lhs, const Vector<uint8_t> &rhs) {
+  static bool operator<(const Vector<uint8_t> &lhs, const Vector<uint8_t> &rhs) {
     if (lhs.size() < rhs.size()) {
-        return true;
+      return true;
     } else if (lhs.size() > rhs.size()) {
-        return false;
+      return false;
     }
 
     return memcmp((void *)lhs.array(), (void *)rhs.array(), rhs.size()) < 0;
-}
+  }
 
-Drm::Drm()
+  Drm::Drm()
     : mInitCheck(NO_INIT),
       mListener(NULL),
       mFactory(NULL),
       mPlugin(NULL) {
-}
+  }
 
-Drm::~Drm() {
+  Drm::~Drm() {
     delete mPlugin;
     mPlugin = NULL;
     closeFactory();
-}
+  }
 
-void Drm::closeFactory() {
+  void Drm::closeFactory() {
     delete mFactory;
     mFactory = NULL;
     mLibrary.clear();
-}
+  }
 
-status_t Drm::initCheck() const {
+  status_t Drm::initCheck() const {
     return mInitCheck;
-}
+  }
 
-status_t Drm::setListener(const sp<IDrmClient>& listener)
-{
+  status_t Drm::setListener(const sp<IDrmClient>& listener)
+  {
     Mutex::Autolock lock(mEventLock);
     if (mListener != NULL){
-        mListener->asBinder()->unlinkToDeath(this);
+      mListener->asBinder()->unlinkToDeath(this);
     }
     if (listener != NULL) {
-        listener->asBinder()->linkToDeath(this);
+      listener->asBinder()->linkToDeath(this);
     }
     mListener = listener;
     return NO_ERROR;
-}
+  }
 
-void Drm::sendEvent(DrmPlugin::EventType eventType, int extra,
-                    Vector<uint8_t> const *sessionId,
-                    Vector<uint8_t> const *data)
-{
+  void Drm::sendEvent(DrmPlugin::EventType eventType, int extra,
+		      Vector<uint8_t> const *sessionId,
+		      Vector<uint8_t> const *data)
+  {
     mEventLock.lock();
     sp<IDrmClient> listener = mListener;
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        if (sessionId && sessionId->size()) {
-            obj.writeInt32(sessionId->size());
-            obj.write(sessionId->array(), sessionId->size());
-        } else {
-            obj.writeInt32(0);
-        }
+      Parcel obj;
+      if (sessionId && sessionId->size()) {
+	obj.writeInt32(sessionId->size());
+	obj.write(sessionId->array(), sessionId->size());
+      } else {
+	obj.writeInt32(0);
+      }
 
-        if (data && data->size()) {
-            obj.writeInt32(data->size());
-            obj.write(data->array(), data->size());
-        } else {
-            obj.writeInt32(0);
-        }
+      if (data && data->size()) {
+	obj.writeInt32(data->size());
+	obj.write(data->array(), data->size());
+      } else {
+	obj.writeInt32(0);
+      }
 
-        Mutex::Autolock lock(mNotifyLock);
-        listener->notify(eventType, extra, &obj);
+      Mutex::Autolock lock(mNotifyLock);
+      listener->notify(eventType, extra, &obj);
     }
-}
+  }
 
-/*
- * Search the plugins directory for a plugin that supports the scheme
- * specified by uuid
- *
- * If found:
- *    mLibrary holds a strong pointer to the dlopen'd library
- *    mFactory is set to the library's factory method
- *    mInitCheck is set to OK
- *
- * If not found:
- *    mLibrary is cleared and mFactory are set to NULL
- *    mInitCheck is set to an error (!OK)
- */
-void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
+  /*
+   * Search the plugins directory for a plugin that supports the scheme
+   * specified by uuid
+   *
+   * If found:
+   *    mLibrary holds a strong pointer to the dlopen'd library
+   *    mFactory is set to the library's factory method
+   *    mInitCheck is set to OK
+   *
+   * If not found:
+   *    mLibrary is cleared and mFactory are set to NULL
+   *    mInitCheck is set to an error (!OK)
+   */
+  void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
+
+    ALOGV("Drm::findFactoryForScheme - Enter");
+    ALOGV("Drm::findFactoryForScheme - UUID='"
+	  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x'",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
 
     closeFactory();
 
@@ -135,459 +143,500 @@ void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
     uuidVector.appendArray(uuid, sizeof(uuid));
     ssize_t index = mUUIDToLibraryPathMap.indexOfKey(uuidVector);
     if (index >= 0) {
-        if (loadLibraryForScheme(mUUIDToLibraryPathMap[index], uuid)) {
-            mInitCheck = OK;
-            return;
-        } else {
-            ALOGE("Failed to load from cached library path!");
-            mInitCheck = ERROR_UNSUPPORTED;
-            return;
-        }
+      ALOGV("Drm::findFactoryForScheme - Found an entry (%d) for this scheme", index);
+      if (loadLibraryForScheme(mUUIDToLibraryPathMap[index], uuid)) {
+	ALOGV("Drm::findFactoryForScheme - Plugin (idx %d) loaded !", index);
+	mInitCheck = OK;
+	return;
+      } else {
+	ALOGE("Failed to load from cached library path!");
+	mInitCheck = ERROR_UNSUPPORTED;
+	return;
+      }
     }
 
     // no luck, have to search
     String8 dirPath("/vendor/lib/mediadrm");
     DIR* pDir = opendir(dirPath.string());
+    
+    ALOGV("Drm::findFactoryForScheme - Trying to load plugins in /vendor/lib/mediadrm");
 
     if (pDir == NULL) {
-        mInitCheck = ERROR_UNSUPPORTED;
-        ALOGE("Failed to open plugin directory %s", dirPath.string());
-        return;
+      mInitCheck = ERROR_UNSUPPORTED;
+      ALOGE("Failed to open plugin directory %s", dirPath.string());
+      return;
     }
 
 
     struct dirent* pEntry;
     while ((pEntry = readdir(pDir))) {
 
-        String8 pluginPath = dirPath + "/" + pEntry->d_name;
+      String8 pluginPath = dirPath + "/" + pEntry->d_name;
 
-        if (pluginPath.getPathExtension() == ".so") {
+      ALOGV("Drm::findFactoryForScheme - Try plugin path '%s'", pluginPath.string());
+      if (pluginPath.getPathExtension() == ".so") {
 
-            if (loadLibraryForScheme(pluginPath, uuid)) {
-                mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
-                mInitCheck = OK;
-                closedir(pDir);
-                return;
-            }
-        }
+	if (loadLibraryForScheme(pluginPath, uuid)) {
+	  ALOGV("Drm::findFactoryForScheme - Plugin '%s' loaded", pluginPath.string());
+	  mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
+	  mInitCheck = OK;
+	  closedir(pDir);
+	  return;
+	}
+      }
     }
 
     closedir(pDir);
 
     ALOGE("Failed to find drm plugin");
     mInitCheck = ERROR_UNSUPPORTED;
-}
+  }
 
-bool Drm::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
+  bool Drm::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
+
+    ALOGV("Drm::loadLibraryForScheme - Enter");
+    ALOGV("Drm::loadLibraryForScheme - path = '%s'", path.string());
+    ALOGV("Drm::loadLibraryForScheme - UUID='"
+	  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x'",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
 
     // get strong pointer to open shared library
     ssize_t index = mLibraryPathToOpenLibraryMap.indexOfKey(path);
     if (index >= 0) {
-        mLibrary = mLibraryPathToOpenLibraryMap[index].promote();
+      mLibrary = mLibraryPathToOpenLibraryMap[index].promote();
     } else {
-        index = mLibraryPathToOpenLibraryMap.add(path, NULL);
+      index = mLibraryPathToOpenLibraryMap.add(path, NULL);
     }
 
     if (!mLibrary.get()) {
-        mLibrary = new SharedLibrary(path);
-        if (!*mLibrary) {
-            return false;
-        }
+      ALOGV("Drm::loadLibraryForScheme - Opening library '%s'", path.string());
+      mLibrary = new SharedLibrary(path);
+      if (!*mLibrary) {
+	ALOGE("Drm::loadLibraryForScheme - Cannot open library '%s'", path.string());
+	return false;
+      }
 
-        mLibraryPathToOpenLibraryMap.replaceValueAt(index, mLibrary);
+      mLibraryPathToOpenLibraryMap.replaceValueAt(index, mLibrary);
     }
+
+    ALOGV("Drm::loadLibraryForScheme - Lookup DRM factory in library '%s'", path.string());
 
     typedef DrmFactory *(*CreateDrmFactoryFunc)();
 
     CreateDrmFactoryFunc createDrmFactory =
-        (CreateDrmFactoryFunc)mLibrary->lookup("createDrmFactory");
+      (CreateDrmFactoryFunc)mLibrary->lookup("createDrmFactory");
+
+    ALOGV("Drm::loadLibraryForScheme - Factory at %p: calling...", createDrmFactory);
 
     if (createDrmFactory == NULL ||
-        (mFactory = createDrmFactory()) == NULL ||
-        !mFactory->isCryptoSchemeSupported(uuid)) {
-        closeFactory();
-        return false;
-    }
-    return true;
-}
+        (mFactory = createDrmFactory()) == NULL)
+      {
+	closeFactory();
+	ALOGE("Drm::loadLibraryForScheme - Cannot invoke DRM factory");
+	return false;	
+      }
+    else
+      {
+	bool supp = mFactory->isCryptoSchemeSupported(uuid);
+	ALOGE("Drm::loadLibraryForScheme - Got DRM factory: UUID supported ? %s", supp ? "YES" : "NO");
+	if (!supp) 
+	  {
+	    closeFactory();
+	    ALOGE("Drm::loadLibraryForScheme - Plugin at '%s' do not support scheme "
+		  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x'",
+		  path.string(),
+		  uuid[0], uuid[1], uuid[2], uuid[3], 
+		  uuid[4], uuid[5], uuid[6], uuid[7], 
+		  uuid[8], uuid[9], uuid[10], uuid[11], 
+		  uuid[12], uuid[13], uuid[14], uuid[15]);
+	    return false;
+	  }
+      }
 
-bool Drm::isCryptoSchemeSupported(const uint8_t uuid[16]) {
+    ALOGV("Drm::loadLibraryForScheme - DRM factory called successfully: UUID supported !!!");
+    return true;
+  }
+
+  bool Drm::isCryptoSchemeSupported(const uint8_t uuid[16]) {
     Mutex::Autolock autoLock(mLock);
 
     if (mFactory && mFactory->isCryptoSchemeSupported(uuid)) {
-        return true;
+      return true;
     }
 
     findFactoryForScheme(uuid);
     return (mInitCheck == OK);
-}
+  }
 
-status_t Drm::createPlugin(const uint8_t uuid[16]) {
+  status_t Drm::createPlugin(const uint8_t uuid[16]) {
     Mutex::Autolock autoLock(mLock);
 
     if (mPlugin != NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     if (!mFactory || !mFactory->isCryptoSchemeSupported(uuid)) {
-        findFactoryForScheme(uuid);
+      findFactoryForScheme(uuid);
     }
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     status_t result = mFactory->createDrmPlugin(uuid, &mPlugin);
     mPlugin->setListener(this);
     return result;
-}
+  }
 
-status_t Drm::destroyPlugin() {
+  status_t Drm::destroyPlugin() {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     delete mPlugin;
     mPlugin = NULL;
 
     return OK;
-}
+  }
 
-status_t Drm::openSession(Vector<uint8_t> &sessionId) {
+  status_t Drm::openSession(Vector<uint8_t> &sessionId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->openSession(sessionId);
-}
+  }
 
-status_t Drm::closeSession(Vector<uint8_t> const &sessionId) {
+  status_t Drm::closeSession(Vector<uint8_t> const &sessionId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->closeSession(sessionId);
-}
+  }
 
-status_t Drm::getKeyRequest(Vector<uint8_t> const &sessionId,
-                            Vector<uint8_t> const &initData,
-                            String8 const &mimeType, DrmPlugin::KeyType keyType,
-                            KeyedVector<String8, String8> const &optionalParameters,
-                            Vector<uint8_t> &request, String8 &defaultUrl) {
+  status_t Drm::getKeyRequest(Vector<uint8_t> const &sessionId,
+			      Vector<uint8_t> const &initData,
+			      String8 const &mimeType, DrmPlugin::KeyType keyType,
+			      KeyedVector<String8, String8> const &optionalParameters,
+			      Vector<uint8_t> &request, String8 &defaultUrl) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->getKeyRequest(sessionId, initData, mimeType, keyType,
                                   optionalParameters, request, defaultUrl);
-}
+  }
 
-status_t Drm::provideKeyResponse(Vector<uint8_t> const &sessionId,
-                                 Vector<uint8_t> const &response,
-                                 Vector<uint8_t> &keySetId) {
+  status_t Drm::provideKeyResponse(Vector<uint8_t> const &sessionId,
+				   Vector<uint8_t> const &response,
+				   Vector<uint8_t> &keySetId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->provideKeyResponse(sessionId, response, keySetId);
-}
+  }
 
-status_t Drm::removeKeys(Vector<uint8_t> const &keySetId) {
+  status_t Drm::removeKeys(Vector<uint8_t> const &keySetId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->removeKeys(keySetId);
-}
+  }
 
-status_t Drm::restoreKeys(Vector<uint8_t> const &sessionId,
-                          Vector<uint8_t> const &keySetId) {
+  status_t Drm::restoreKeys(Vector<uint8_t> const &sessionId,
+			    Vector<uint8_t> const &keySetId) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->restoreKeys(sessionId, keySetId);
-}
+  }
 
-status_t Drm::queryKeyStatus(Vector<uint8_t> const &sessionId,
-                             KeyedVector<String8, String8> &infoMap) const {
+  status_t Drm::queryKeyStatus(Vector<uint8_t> const &sessionId,
+			       KeyedVector<String8, String8> &infoMap) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->queryKeyStatus(sessionId, infoMap);
-}
+  }
 
-status_t Drm::getProvisionRequest(Vector<uint8_t> &request, String8 &defaultUrl) {
+  status_t Drm::getProvisionRequest(Vector<uint8_t> &request, String8 &defaultUrl) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->getProvisionRequest(request, defaultUrl);
-}
+  }
 
-status_t Drm::provideProvisionResponse(Vector<uint8_t> const &response) {
+  status_t Drm::provideProvisionResponse(Vector<uint8_t> const &response) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->provideProvisionResponse(response);
-}
+  }
 
 
-status_t Drm::getSecureStops(List<Vector<uint8_t> > &secureStops) {
+  status_t Drm::getSecureStops(List<Vector<uint8_t> > &secureStops) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->getSecureStops(secureStops);
-}
+  }
 
-status_t Drm::releaseSecureStops(Vector<uint8_t> const &ssRelease) {
+  status_t Drm::releaseSecureStops(Vector<uint8_t> const &ssRelease) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->releaseSecureStops(ssRelease);
-}
+  }
 
-status_t Drm::getPropertyString(String8 const &name, String8 &value ) const {
+  status_t Drm::getPropertyString(String8 const &name, String8 &value ) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->getPropertyString(name, value);
-}
+  }
 
-status_t Drm::getPropertyByteArray(String8 const &name, Vector<uint8_t> &value ) const {
+  status_t Drm::getPropertyByteArray(String8 const &name, Vector<uint8_t> &value ) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->getPropertyByteArray(name, value);
-}
+  }
 
-status_t Drm::setPropertyString(String8 const &name, String8 const &value ) const {
+  status_t Drm::setPropertyString(String8 const &name, String8 const &value ) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->setPropertyString(name, value);
-}
+  }
 
-status_t Drm::setPropertyByteArray(String8 const &name,
-                                   Vector<uint8_t> const &value ) const {
+  status_t Drm::setPropertyByteArray(String8 const &name,
+				     Vector<uint8_t> const &value ) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->setPropertyByteArray(name, value);
-}
+  }
 
 
-status_t Drm::setCipherAlgorithm(Vector<uint8_t> const &sessionId,
-                                 String8 const &algorithm) {
+  status_t Drm::setCipherAlgorithm(Vector<uint8_t> const &sessionId,
+				   String8 const &algorithm) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->setCipherAlgorithm(sessionId, algorithm);
-}
+  }
 
-status_t Drm::setMacAlgorithm(Vector<uint8_t> const &sessionId,
-                              String8 const &algorithm) {
+  status_t Drm::setMacAlgorithm(Vector<uint8_t> const &sessionId,
+				String8 const &algorithm) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->setMacAlgorithm(sessionId, algorithm);
-}
+  }
 
-status_t Drm::encrypt(Vector<uint8_t> const &sessionId,
-                      Vector<uint8_t> const &keyId,
-                      Vector<uint8_t> const &input,
-                      Vector<uint8_t> const &iv,
-                      Vector<uint8_t> &output) {
+  status_t Drm::encrypt(Vector<uint8_t> const &sessionId,
+			Vector<uint8_t> const &keyId,
+			Vector<uint8_t> const &input,
+			Vector<uint8_t> const &iv,
+			Vector<uint8_t> &output) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->encrypt(sessionId, keyId, input, iv, output);
-}
+  }
 
-status_t Drm::decrypt(Vector<uint8_t> const &sessionId,
-                      Vector<uint8_t> const &keyId,
-                      Vector<uint8_t> const &input,
-                      Vector<uint8_t> const &iv,
-                      Vector<uint8_t> &output) {
+  status_t Drm::decrypt(Vector<uint8_t> const &sessionId,
+			Vector<uint8_t> const &keyId,
+			Vector<uint8_t> const &input,
+			Vector<uint8_t> const &iv,
+			Vector<uint8_t> &output) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->decrypt(sessionId, keyId, input, iv, output);
-}
+  }
 
-status_t Drm::sign(Vector<uint8_t> const &sessionId,
-                   Vector<uint8_t> const &keyId,
-                   Vector<uint8_t> const &message,
-                   Vector<uint8_t> &signature) {
+  status_t Drm::sign(Vector<uint8_t> const &sessionId,
+		     Vector<uint8_t> const &keyId,
+		     Vector<uint8_t> const &message,
+		     Vector<uint8_t> &signature) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->sign(sessionId, keyId, message, signature);
-}
+  }
 
-status_t Drm::verify(Vector<uint8_t> const &sessionId,
-                     Vector<uint8_t> const &keyId,
-                     Vector<uint8_t> const &message,
-                     Vector<uint8_t> const &signature,
-                     bool &match) {
+  status_t Drm::verify(Vector<uint8_t> const &sessionId,
+		       Vector<uint8_t> const &keyId,
+		       Vector<uint8_t> const &message,
+		       Vector<uint8_t> const &signature,
+		       bool &match) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+      return mInitCheck;
     }
 
     if (mPlugin == NULL) {
-        return -EINVAL;
+      return -EINVAL;
     }
 
     return mPlugin->verify(sessionId, keyId, message, signature, match);
-}
+  }
 
-void Drm::binderDied(const wp<IBinder> &the_late_who)
-{
+  void Drm::binderDied(const wp<IBinder> &the_late_who)
+  {
     delete mPlugin;
     mPlugin = NULL;
     closeFactory();
     mListener.clear();
-}
+  }
 
 }  // namespace android

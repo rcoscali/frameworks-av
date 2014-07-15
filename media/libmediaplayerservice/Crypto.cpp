@@ -80,7 +80,9 @@ namespace android {
    *    mInitCheck is set to an error (!OK)
    */
   void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
+
     ALOGV("Crypto::findFactoryForScheme - Enter");
+
     closeFactory();
 
     // lock static maps
@@ -135,7 +137,7 @@ namespace android {
 		uuid[8], uuid[9], uuid[10], uuid[11], 
 		uuid[12], uuid[13], uuid[14], uuid[15]);
 	  if (loadLibraryForScheme(pluginPath, uuid)) {
-	    ALOGV("Crypto::findFactoryForScheme - Plugin found & loaded !!");
+	    ALOGV("Crypto::findFactoryForScheme - Adding plugin at %s in cache", pluginPath.string());
 	    mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
 	    mInitCheck = OK;
 	    closedir(pDir);
@@ -150,9 +152,11 @@ namespace android {
     ALOGV("Crypto::findFactoryForScheme - No luck: trying legacy libdrmdecrypt.so");
 
     // try the legacy libdrmdecrypt.so
+    ALOGV("Crypto::findFactoryForScheme - Trying to load legacy library libdrmdecrypt.so");
     pluginPath = "libdrmdecrypt.so";
     if (loadLibraryForScheme(pluginPath, uuid)) {
       ALOGV("Crypto::findFactoryForScheme - Yes :) ! this is your lucky day !");
+      ALOGV("Crypto::findFactoryForScheme - Adding legacy library libdrmdecrypt.so to cache");
       mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
       mInitCheck = OK;
       return;
@@ -173,7 +177,7 @@ namespace android {
 	  uuid[4], uuid[5], uuid[6], uuid[7], 
 	  uuid[8], uuid[9], uuid[10], uuid[11], 
 	  uuid[12], uuid[13], uuid[14], uuid[15]);
-    
+
     // get strong pointer to open shared library
     ssize_t index = mLibraryPathToOpenLibraryMap.indexOfKey(path);
     if (index >= 0) {
@@ -187,7 +191,7 @@ namespace android {
     if (!mLibrary.get()) {
       mLibrary = new SharedLibrary(path);
       if (!*mLibrary) {
-	ALOGE("Couldn't load library %s", path.string());
+	ALOGE("Crypto::loadLibraryForScheme - Error: library %s not loaded", path.string());
 	return false;
       }
 

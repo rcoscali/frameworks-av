@@ -89,26 +89,32 @@ void DrmManager::removeUniqueId(int uniqueId) {
 
 status_t DrmManager::loadPlugIns() {
 
-  ALOGV("DrmManager::loadPlugIns - Trying to load plugins from /vendor/lib/drm");
+  ALOGV("DrmManager::loadPlugIns - Enter");
+
   String8 vendorPluginDirPath("/vendor/lib/drm");
+  ALOGV("DrmManager::loadPlugIns - loading from '%s'", vendorPluginDirPath.string());
   loadPlugIns(vendorPluginDirPath);
 
-  ALOGV("DrmManager::loadPlugIns - Trying to load plugins from /system/lib/drm");
   String8 pluginDirPath("/system/lib/drm");
+  ALOGV("DrmManager::loadPlugIns - loading from '%s'", pluginDirPath.string());
   loadPlugIns(pluginDirPath);
   return DRM_NO_ERROR;
 
 }
 
 status_t DrmManager::loadPlugIns(const String8& plugInDirPath) {
-  ALOGV("DrmManager::loadPlugIns(path) - Enter");
-  ALOGV("DrmManager::loadPlugIns(path) - path = '%s'", plugInDirPath.string());
+
+  ALOGV("DrmManager::loadPlugIns(<path>) - Enter");
+
   mPlugInManager.loadPlugIns(plugInDirPath);
   Vector<String8> plugInPathList = mPlugInManager.getPlugInIdList();
+  ALOGV("DrmManager::loadPlugIns(<path>) - Found %d plugins", plugInPathList.size());
   for (unsigned int i = 0; i < plugInPathList.size(); ++i) {
     String8 plugInPath = plugInPathList[i];
     DrmSupportInfo* info = mPlugInManager.getPlugIn(plugInPath).getSupportInfo(0);
+    ALOGV("DrmManager::loadPlugIns(<path>) - plugin %s ...", plugInPath.string());
     if (NULL != info) {
+      ALOGV("DrmManager::loadPlugIns(<path>) - ... %s", info->getDescription().string());
       if (mSupportInfoToPlugInIdMap.indexOfKey(*info) < 0) {
 	mSupportInfoToPlugInIdMap.add(*info, plugInPath);
       }
