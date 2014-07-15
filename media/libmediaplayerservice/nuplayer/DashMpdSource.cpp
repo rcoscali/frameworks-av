@@ -64,28 +64,28 @@ namespace android
 
   NuPlayer::DashMpdSource::~DashMpdSource() 
   {
-    if (mLiveSession != NULL) 
+    if (mDashSession != NULL) 
       {
-	mLiveSession->disconnect();
-	mLiveLooper->stop();
+	mDashSession->disconnect();
+	mDashLooper->stop();
       }
   }
 
   void NuPlayer::DashMpdSource::prepareAsync()
   {
-    mLiveLooper = new ALooper;
-    mLiveLooper->setName("Dynamic Adaptive Streaming over HTTP");
-    mLiveLooper->start();
+    mDashLooper = new ALooper;
+    mDashLooper->setName("Dynamic Adaptive Streaming over HTTP");
+    mDashLooper->start();
 
     sp<AMessage> notify = new AMessage(kWhatSessionNotify, id());
 
-    mLiveSession = new LiveSession(notify,
+    mDashSession = new DashSession(notify,
 				   (mFlags & kFlagIncognito) ? LiveSession::kFlagIncognito : 0,
 				   mUIDValid, mUID);
 
-    mLiveLooper->registerHandler(mLiveSession);
+    mDashLooper->registerHandler(mDashSession);
 
-    mLiveSession->connect(mURL.c_str(), 
+    mDashSession->connect(mURL.c_str(), 
 			  mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
 
     mMPDParser = new MPDParser;
@@ -112,7 +112,7 @@ namespace android
     }
 
     sp<LiveDataSource> source =
-      static_cast<LiveDataSource *>(mLiveSession->getDataSource().get());
+      static_cast<LiveDataSource *>(mDashSession->getDataSource().get());
 
     for (int32_t i = 0; i < 50; ++i) {
       char buffer[188];
@@ -188,7 +188,7 @@ namespace android
   }
 
   status_t NuPlayer::DashMpdSource::getDuration(int64_t *durationUs) {
-    return mLiveSession->getDuration(durationUs);
+    return mDashSession->getDuration(durationUs);
   }
 
   status_t NuPlayer::DashMpdSource::seekTo(int64_t seekTimeUs) {
@@ -198,7 +198,7 @@ namespace android
       usleep(100000);
     }
 
-    mLiveSession->seekTo(seekTimeUs);
+    mDashSession->seekTo(seekTimeUs);
 
     return OK;
   }
@@ -227,13 +227,13 @@ namespace android
 	notifyVideoSizeChanged(0, 0);
 
 	uint32_t flags = FLAG_CAN_PAUSE;
-	if (mLiveSession->isSeekable()) {
+	if (mDashSession->isSeekable()) {
 	  flags |= FLAG_CAN_SEEK;
 	  flags |= FLAG_CAN_SEEK_BACKWARD;
 	  flags |= FLAG_CAN_SEEK_FORWARD;
 	}
 
-	if (mLiveSession->hasDynamicDuration()) {
+	if (mDashSession->hasDynamicDuration()) {
 	  flags |= FLAG_DYNAMIC_DURATION;
 	}
 

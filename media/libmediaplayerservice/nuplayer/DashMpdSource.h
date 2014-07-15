@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2014 Nagravision
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 
 #ifndef DASH_MPD_SOURCE_H_
-
 #define DASH_MPD_SOURCE_H_
 
 #include "NuPlayer.h"
@@ -33,12 +32,12 @@ struct NuPlayer::DashMpdSource : public NuPlayer::Source {
             const char*                          url,
             const KeyedVector<String8, String8> *headers,
                   bool                           uidValid = false,
-                   uid_t                         uid = 0);
+                  uid_t                          uid = 0);
 
     virtual void prepareAsync();
     virtual void start();
 
-    virtual status_t feedMoreTSData();
+    //    virtual status_t feedMoreTSData();
     virtual status_t feedMoreISOBMFFData();
 
     virtual status_t dequeueAccessUnit(bool audio, sp<ABuffer> *accessUnit);
