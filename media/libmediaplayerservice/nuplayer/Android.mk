@@ -12,8 +12,7 @@ LOCAL_SRC_FILES:=                       \
         NuPlayerStreamListener.cpp      \
         RTSPSource.cpp                  \
         StreamingSource.cpp             \
-        mp4/MP4Source.cpp               \
-        dash/MPDParser.cpp
+        mp4/MP4Source.cpp
 
 LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/av/media/libstagefright/httplive            \
