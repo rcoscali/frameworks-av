@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "drmserver"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>

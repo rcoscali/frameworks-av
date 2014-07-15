@@ -4,6 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:=                       \
         GenericSource.cpp               \
         HTTPLiveSource.cpp              \
+        DashMpdSource.cpp               \
         NuPlayer.cpp                    \
         NuPlayerDecoder.cpp             \
         NuPlayerDriver.cpp              \
@@ -12,6 +13,7 @@ LOCAL_SRC_FILES:=                       \
         RTSPSource.cpp                  \
         StreamingSource.cpp             \
         mp4/MP4Source.cpp               \
+        dash/MPDParser.cpp
 
 LOCAL_C_INCLUDES := \
 	$(TOP)/frameworks/av/media/libstagefright/httplive            \

@@ -176,6 +176,23 @@ static bool IsHTTPLiveURL(const char *url) {
     return false;
 }
 
+static bool IsDashURL(const char *url) {
+    if (!strncasecmp("http://", url, 7)
+            || !strncasecmp("https://", url, 8)
+            || !strncasecmp("file://", url, 7)) {
+        size_t len = strlen(url);
+        if (len >= 4 && !strcasecmp(".mdp", &url[len - 4])) {
+            return true;
+        }
+
+        if (strstr(url,"mdp")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void NuPlayer::setDataSourceAsync(
         const char *url, const KeyedVector<String8, String8> *headers) {
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, id());
@@ -186,6 +203,8 @@ void NuPlayer::setDataSourceAsync(
     sp<Source> source;
     if (IsHTTPLiveURL(url)) {
         source = new HTTPLiveSource(notify, url, headers, mUIDValid, mUID);
+    } else if (IsDashURL(url)) {
+        source = new DashSource(notify, url, headers, mUIDValid, mUID);
     } else if (!strncasecmp(url, "rtsp://", 7)) {
         source = new RTSPSource(notify, url, headers, mUIDValid, mUID);
     } else if ((!strncasecmp(url, "http://", 7)
