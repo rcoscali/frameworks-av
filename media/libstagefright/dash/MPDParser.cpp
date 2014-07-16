@@ -536,6 +536,129 @@ namespace android {
     return exists;
   }
 
+  static MPDRange *
+  mpdparser_clone_range (MPDRange * range)
+  {
+    MPDRange *clone = NULL;
+
+    if (range) 
+      {
+	clone = new MPDRange(range->first_byte_pos, range->last_byte_pos);
+      } 
+
+    return clone;
+  }
+
+  static MPDUrlType *
+  mpdparser_clone_URL (MPDUrlType * url)
+  {
+    MPDUrlType *clone = NULL;
+
+    if (url && url->sourceURL) 
+      {
+	clone = new MPDUrlType(xmlMemStrdup (url->sourceURL), mpdparser_clone_range (url->range));
+      } 
+    else 
+      {
+	ALOGW ("Allocation of URLType node failed!");
+      }
+
+    return clone;
+  }
+
+  static bool
+  mpdparser_get_xml_prop_unsigned_integer (xmlNode * a_node,
+					   const char * property_name, 
+					   uint32_t default_val, 
+					   uint32_t * property_value)
+  {
+    xmlChar *prop_string;
+    bool exists = FALSE;
+
+    *property_value = default_val;
+    prop_string = xmlGetProp (a_node, (const xmlChar *) property_name);
+    if (prop_string) 
+      {
+	if (sscanf ((char *) prop_string, "%u", property_value)) 
+	  {
+	    exists = TRUE;
+	    ALOGV (" - %s: %u", property_name, *property_value);
+	  }
+	else
+	  {
+	    ALOGW("failed to parse unsigned integer property "
+		  "%s from xml string %s",
+		  property_name, prop_string);
+	  }
+	
+	xmlFree (prop_string);
+      }
+    
+    return exists;
+  }
+  
+  static bool
+  mpdparser_get_xml_prop_range (xmlNode * a_node, const char * property_name,
+				MPDRange ** property_value)
+  {
+    xmlChar *prop_string;
+    uint64_t first_byte_pos = 0, last_byte_pos = 0;
+    uint32_t len, pos;
+    char *str;
+    bool exists = FALSE;
+
+    prop_string = xmlGetProp (a_node, (const xmlChar *) property_name);
+    if (prop_string) 
+      {
+	len = xmlStrlen (prop_string);
+	str = (char *) prop_string;
+	ALOGV ("range: %s, len %d", str, len);
+
+	/* read "-" */
+	pos = strcspn (str, "-");
+	if (pos >= len) 
+	  {
+	    ALOGV ("pos %d >= len %d", pos, len);
+	    goto error;
+	  }
+
+	/* read first_byte_pos */
+	if (pos != 0) 
+	  {
+	    if (sscanf (str, "%ld", &first_byte_pos) != 1) 
+	      {
+		goto error;
+	      }
+	  }
+	/* read last_byte_pos */
+	if (pos < (len - 1)) 
+	  {
+	    if (sscanf (str + pos + 1, "%ld", &last_byte_pos) != 1) 
+	      {
+		goto error;
+	      }
+	  }
+	/* malloc return data structure */
+	*property_value = new MPDRange(first_byte_pos, last_byte_pos);
+	if (*property_value == NULL) 
+	  {
+	    ALOGV ("Allocation of GstRange failed!");
+	    goto error;
+	  }
+	exists = TRUE;
+	xmlFree (prop_string);
+	ALOGV (" - %s: %ld-%ld", property_name, first_byte_pos, last_byte_pos);
+      }
+
+    return exists;
+
+  error:
+    xmlFree (prop_string);
+    ALOGW ("failed to parse property %s from xml string %s", 
+	   property_name, prop_string);
+    return FALSE;
+  }
+
   static void
   mpdparser_parse_seg_base_type_ext (MPDSegmentBaseType ** pointer,
 				     xmlNode * a_node, MPDSegmentBaseType * parent)
