@@ -1043,3 +1043,6 @@ namespace android {
 
 }  // namespace android
 
+// Local Variables:
+// mode:C++
+// End:

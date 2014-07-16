@@ -23,26 +23,26 @@
 
 namespace android {
 
-struct ABuffer;
-struct DataSource;
-struct LiveDataSource;
-struct MPDParser;
-struct HTTPBase;
+  struct ABuffer;
+  struct DataSource;
+  struct DashDataSource;
+  struct MPDParser;
+  struct HTTPBase;
 
-struct DASHSession : public AHandler {
+  class DashSession : public AHandler {
     enum Flags {
-        // Don't log any URLs.
-        kFlagIncognito = 1,
+      // Don't log any URLs.
+      kFlagIncognito = 1,
     };
-    LiveSession(
-            const sp<AMessage> &notify,
-            uint32_t flags = 0, bool uidValid = false, uid_t uid = 0);
+
+    DashSession(const sp<AMessage> &notify,
+		uint32_t flags = 0, bool uidValid = false, uid_t uid = 0);
 
     sp<DataSource> getDataSource();
 
     void connect(
-            const char *url,
-            const KeyedVector<String8, String8> *headers = NULL);
+		 const char *url,
+		 const KeyedVector<String8, String8> *headers = NULL);
 
     void disconnect();
 
@@ -56,31 +56,32 @@ struct DASHSession : public AHandler {
 
     // Posted notification's "what" field will carry one of the following:
     enum {
-        kWhatPrepared,
-        kWhatPreparationFailed,
+      kWhatPrepared,
+      kWhatPreparationFailed,
     };
 
-protected:
+  protected:
     virtual ~DashSession();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
-private:
+  private:
+
     enum {
-        kMaxNumQueuedFragments = 3,
-        kMaxNumRetries         = 5,
+      kMaxNumQueuedFragments = 3,
+      kMaxNumRetries         = 5,
     };
 
     enum {
-        kWhatConnect        = 'conn',
-        kWhatDisconnect     = 'disc',
-        kWhatMonitorQueue   = 'moni',
-        kWhatSeek           = 'seek',
+      kWhatConnect        = 'conn',
+      kWhatDisconnect     = 'disc',
+      kWhatMonitorQueue   = 'moni',
+      kWhatSeek           = 'seek',
     };
 
     struct BandwidthItem {
-        AString mURI;
-        unsigned long mBandwidth;
+      AString mURI;
+      unsigned long mBandwidth;
     };
 
     sp<AMessage> mNotify;
@@ -90,7 +91,7 @@ private:
 
     bool mInPreparationPhase;
 
-    sp<LiveDataSource> mDataSource;
+    sp<DashDataSource> mDataSource;
 
     sp<HTTPBase> mHTTPDataSource;
 
@@ -102,7 +103,7 @@ private:
     KeyedVector<AString, sp<ABuffer> > mAESKeyForURI;
 
     ssize_t mPrevBandwidthIndex;
-    int64_t mLastPlaylistFetchTimeUs;
+    int64_t mLastMpdFetchTimeUs;
     sp<MPDParser> mMpd;
     int32_t mSeqNumber;
     int64_t mSeekTimeUs;
@@ -119,10 +120,10 @@ private:
     int32_t mMonitorQueueGeneration;
 
     enum RefreshState {
-        INITIAL_MINIMUM_RELOAD_DELAY,
-        FIRST_UNCHANGED_RELOAD_ATTEMPT,
-        SECOND_UNCHANGED_RELOAD_ATTEMPT,
-        THIRD_UNCHANGED_RELOAD_ATTEMPT
+      INITIAL_MINIMUM_RELOAD_DELAY,
+      FIRST_UNCHANGED_RELOAD_ATTEMPT,
+      SECOND_UNCHANGED_RELOAD_ATTEMPT,
+      THIRD_UNCHANGED_RELOAD_ATTEMPT
     };
     RefreshState mRefreshState;
 
@@ -134,19 +135,17 @@ private:
     void onMonitorQueue();
     void onSeek(const sp<AMessage> &msg);
 
-    status_t fetchFile(
-            const char *url, sp<ABuffer> *out,
-            int64_t range_offset = 0, int64_t range_length = -1);
+    status_t fetchFile(const char *url, sp<ABuffer> *out,
+		       int64_t range_offset = 0, int64_t range_length = -1);
 
-    sp<M3UParser> fetchPlaylist(const char *url, bool *unchanged);
+    sp<MPDParser> fetchMpd(const char *url, bool *unchanged);
     size_t getBandwidthIndex();
 
-    status_t decryptBuffer(
-            size_t playlistIndex, const sp<ABuffer> &buffer);
+    status_t decryptBuffer(size_t mpdIndex, const sp<ABuffer> &buffer);
 
     void postMonitorQueue(int64_t delayUs = 0);
 
-    bool timeToRefreshPlaylist(int64_t nowUs) const;
+    bool timeToRefreshMpd(int64_t nowUs) const;
 
     static int SortByBandwidth(const BandwidthItem *, const BandwidthItem *);
 
@@ -156,9 +155,13 @@ private:
 
     void signalEOS(status_t err);
 
-    DISALLOW_EVIL_CONSTRUCTORS(LiveSession);
-};
+    DISALLOW_EVIL_CONSTRUCTORS(DashSession);
+  };
 
-}  // namespace android
+};  // namespace android
 
-#endif  // LIVE_SESSION_H_
+#endif  // DASH_SESSION_H_
+
+// Local Variables:
+// mode:C++
+// End:

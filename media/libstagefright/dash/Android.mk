@@ -10,7 +10,10 @@ LOCAL_SRC_FILES:=               \
 LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/av/media/libstagefright \
 	$(TOP)/frameworks/native/include/media/openmax \
-	$(TOP)/external/openssl/include
+	$(TOP)/external/openssl/include \
+	$(TOP)/external/stlport/stlport \
+	$(TOP)/bionic \
+	$(TOP)/bionic/libstdc++/include
 
 LOCAL_MODULE:= libstagefright_dash
 
