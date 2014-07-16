@@ -82,7 +82,9 @@ namespace android {
     return true;
   }
 
-  static bool MakeURL(const char *baseURL, const char *url, AString *out) {
+  static bool 
+  MakeURL(const char *baseURL, const char *url, AString *out) 
+  {
     out->clear();
 
     if (strncasecmp("http://", baseURL, 7)
@@ -189,7 +191,7 @@ namespace android {
     
     Note: All components are required!
   */
-  static gboolean
+  static bool
   mpdparser_get_xml_prop_dateTime (xmlNode * a_node,
 				   const char * property_name, 
 				   MPDDateTime ** property_value)
@@ -279,12 +281,13 @@ namespace android {
 
     The time interval is specified in the following form "-PnYnMnDTnHnMnS" where:
 
-      * - indicates the negative sign (optional)
-      * P indicates the period (required)
+      * -  indicates the negative sign (optional)
+      * P  indicates the period (required)
       * nY indicates the number of years
       * nM indicates the number of months
       * nD indicates the number of days
-      * T indicates the start of a time section (required if you are going to specify hours, minutes, or seconds)
+      * T  indicates the start of a time section (required if you are going to 
+      *    specify hours, minutes, or seconds)
       * nH indicates the number of hours
       * nM indicates the number of minutes
       * nS indicates the number of seconds
