@@ -73,6 +73,13 @@ namespace android
     };
 
     /*
+     * Specific ClockTime values
+     */
+    enum {
+      kClockTimeNone = -1
+    };
+
+    /*
      * MPDBaseUrl
      */
     class MPDBaseUrl : public RefBase {

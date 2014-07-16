@@ -26,64 +26,32 @@
 
 namespace android {
 
-  MPDParser::MPDParser(
-	const char *baseURI, const void *data, size_t size)
-    : mInitCheck(NO_INIT),
-      mBaseURI(baseURI),
-      mIsComplete(false),
-      mIsEvent(false) {
-    mInitCheck = parse(data, size);
-  }
+  /* Misc helpers */
+  static bool        mpdparser_make_url (const char *, const char *, AString *);
+  static int64_t     mpdparser_convert_to_millisecs (int32_t, int32_t);
 
-  MPDParser::~MPDParser() {
-  }
+  /* Namespace */
+  static AString *   mpdparser_get_xml_node_namespace (xmlNode *, const char *);
 
-  status_t MPDParser::initCheck() const {
-    return mInitCheck;
-  }
+  /* Properties */
+  static bool        mpdparser_get_xml_prop_dateTime (xmlNode *, const char *, MPDDateTime **);
+  static gboolean    mpdparser_get_xml_prop_duration (xmlNode *, const char *, int64_t, int64_t *);
+  static bool        mpdparser_get_xml_prop_string (xmlNode *, const char *, char **);
+  static bool        mpdparser_get_xml_prop_boolean (xmlNode *, const char *, bool, bool *);
+  static bool        mpdparser_get_xml_prop_unsigned_integer (xmlNode *, const char *, uint32_t, uint32_t *);
+  static bool        mpdparser_get_xml_prop_range (xmlNode *, const char *, MPDRange **);
 
-  bool MPDParser::isComplete() const {
-    return mIsComplete;
-  }
-  
-  bool MPDParser::isEvent() const {
-    return mIsEvent;
-  }
+  /* Elements */
+  static void        mpdparser_parse_seg_base_type_ext (MPDSegmentBaseType **, xmlNode *, MPDSegmentBaseType *);
+  static void        mpdparser_parse_period_node (GList **, xmlNode *);
+  static void        mpdparser_parse_root_node (MPDMpdNode **, xmlNode *);
 
-  sp<AMessage> MPDParser::meta() {
-    return mMeta;
-  }
-
-  size_t MPDParser::size() {
-    return mItems.size();
-  }
-
-  bool MPDParser::itemAt(size_t index, AString *uri, sp<AMessage> *meta) {
-    if (uri) {
-      uri->clear();
-    }
-    
-    if (meta) {
-      *meta = NULL;
-    }
-
-    if (index >= mItems.size()) {
-      return false;
-    }
-
-    if (uri) {
-      *uri = mItems.itemAt(index).mURI;
-    }
-
-    if (meta) {
-      *meta = mItems.itemAt(index).mMeta;
-    }
-
-    return true;
-  }
+  /* Memory mngt */
+  static MPDRange *  mpdparser_clone_range (MPDRange *);
+  static MPDUrlType *mpdparser_clone_URL (MPDUrlType *);
 
   static bool 
-  MakeURL(const char *baseURL, const char *url, AString *out) 
+  mpdparser_make_url(const char *baseURL, const char *url, AString *out) 
   {
     out->clear();
 
@@ -206,7 +174,7 @@ namespace android {
     prop_string = xmlGetProp (a_node, (const xmlChar *) property_name);
     if (prop_string) 
       {
-	str = (gchar *) prop_string;
+	str = (char *) prop_string;
 	ALOGV ("dateTime: %s, len %d", str, xmlStrlen (prop_string));
 
 	/* parse year */
@@ -295,7 +263,7 @@ namespace android {
 
   /* this function computes decimals * 10 ^ (3 - pos) */
   static int64_t
-  convert_to_millisecs (gint decimals, gint pos)
+  mpdparser_convert_to_millisecs (gint decimals, gint pos)
   {
     int num = 1, den = 1, i = 3 - pos;
 
@@ -316,7 +284,7 @@ namespace android {
 
   static gboolean
   mpdparser_get_xml_prop_duration (xmlNode * a_node,
-				   const gchar * property_name, 
+				   const char * property_name, 
 				   int64_t default_value, 
 				   int64_t * property_value)
   {
@@ -431,7 +399,7 @@ namespace android {
 		    if (have_ms) 
 		      {
 			/* we have read the decimal part of the seconds */
-			decimals = convert_to_millisecs (read, pos);
+			decimals = mpdparser_convert_to_millisecs (read, pos);
 			ALOGV ("decimal number %d (%d digits) -> %d ms", read, pos,
 			       decimals);
 		      } 
@@ -483,8 +451,8 @@ namespace android {
 
   static bool
   mpdparser_get_xml_prop_string (xmlNode * a_node,
-				 const gchar * property_name, 
-				 gchar ** property_value)
+				 const char * property_name, 
+				 char ** property_value)
   {
     xmlChar *prop_string;
     bool exists = FALSE;
@@ -746,79 +714,75 @@ namespace android {
   }
 
   static void
-  mpdparser_parse_period_node (GList ** list, xmlNode * a_node)
+  mpdparser_parse_period_node (vector<MPDPeriodNode> *list, xmlNode * a_node)
   {
     xmlNode *cur_node;
     MPDPeriodNode *new_period;
 
     new_period = new MPDPeriodNode();
-    if (new_period == NULL) 
+    if (new_period != NULL) 
+      {
+	(*list)->push_back(new_period);
+
+	new_period->start = kClockTimeNone;
+	
+	ALOGV ("attributes of Period node:");
+	mpdparser_get_xml_prop_string (a_node, "id", &new_period->mId);
+	mpdparser_get_xml_prop_duration (a_node, "start", -1, &new_period->mStart);
+	mpdparser_get_xml_prop_duration (a_node, "duration", -1, &new_period->mDuration);
+	mpdparser_get_xml_prop_boolean (a_node, "bitstreamSwitching", FALSE, &new_period->mBitstreamSwitching);
+	
+	/* explore children nodes */
+	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
+	  {
+	    if (cur_node->type == XML_ELEMENT_NODE) 
+	      {
+		if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentBase") == 0) 
+		  {
+		    mpdparser_parse_seg_base_type_ext (&new_period->mSegmentBase, cur_node, NULL);
+		  } 
+		else if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentList") == 0) 
+		  {
+		    mpdparser_parse_segment_list_node (&new_period->mSegmentList, cur_node, NULL);
+		  } 
+		else if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentTemplate") == 0) 
+		  {
+		    mpdparser_parse_segment_template_node (&new_period->mSegmentTemplate, cur_node, NULL);
+		  } 
+		else if (xmlStrcmp (cur_node->name, (xmlChar *) "Subset") == 0) 
+		  {
+		    mpdparser_parse_subset_node (&new_period->mSubsets, cur_node);
+		  } 
+		else if (xmlStrcmp (cur_node->name, (xmlChar *) "BaseURL") == 0) 
+		  {
+		    mpdparser_parse_baseURL_node (&new_period->mBaseURLs, cur_node);
+		  }
+	      }
+	  }
+	
+	/* We must parse AdaptationSet after everything else in the Period has been
+	 * parsed because certain AdaptationSet child elements can inherit attributes
+	 * specified by the same element in the Period
+	 */
+	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
+	  {
+	    if (cur_node->type == XML_ELEMENT_NODE) 
+	      {
+		if (xmlStrcmp (cur_node->name, (xmlChar *) "AdaptationSet") == 0) 
+		  {
+		    mpdparser_parse_adaptation_set_node (&new_period->mAdaptationSets, cur_node, new_period);
+		  }
+	      }
+	  }
+      }
+    else
       {
 	ALOGW ("Allocation of Period node failed!");
-	return;
-      }
-    *list = g_list_append (*list, new_period);
-
-    new_period->start = GST_CLOCK_TIME_NONE;
-
-    ALOGV ("attributes of Period node:");
-    mpdparser_get_xml_prop_string (a_node, "id", &new_period->mId);
-    mpdparser_get_xml_prop_duration (a_node, "start", -1, &new_period->mStart);
-    mpdparser_get_xml_prop_duration (a_node, "duration", -1,
-				     &new_period->mDuration);
-    mpdparser_get_xml_prop_boolean (a_node, "bitstreamSwitching",
-				    FALSE, &new_period->bitstreamSwitching);
-
-    /* explore children nodes */
-    for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
-      {
-	if (cur_node->type == XML_ELEMENT_NODE) 
-	  {
-	    if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentBase") == 0) 
-	      {
-		mpdparser_parse_seg_base_type_ext (&new_period->mSegmentBase,
-						   cur_node, NULL);
-	      } 
-	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentList") == 0) 
-	      {
-		mpdparser_parse_segment_list_node (&new_period->mSegmentList,
-						   cur_node, NULL);
-	      } 
-	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentTemplate") == 0) 
-	      {
-		mpdparser_parse_segment_template_node (&new_period->mSegmentTemplate,
-						       cur_node, NULL);
-	      } 
-	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "Subset") == 0) 
-	      {
-		mpdparser_parse_subset_node (&new_period->mSubsets, cur_node);
-	      } 
-	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "BaseURL") == 0) 
-	      {
-		mpdparser_parse_baseURL_node (&new_period->mBaseURLs, cur_node);
-	      }
-	  }
-      }
-    
-    /* We must parse AdaptationSet after everything else in the Period has been
-     * parsed because certain AdaptationSet child elements can inherit attributes
-     * specified by the same element in the Period
-     */
-    for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
-      {
-	if (cur_node->type == XML_ELEMENT_NODE) 
-	  {
-	    if (xmlStrcmp (cur_node->name, (xmlChar *) "AdaptationSet") == 0) 
-	      {
-		mpdparser_parse_adaptation_set_node (&new_period->mAdaptationSets,
-						     cur_node, new_period);
-	      }
-	  }
       }
   }
   
   static void
-  parse_root_node (MPDMpdNode **an_mpdNode, xmlNode * a_node)
+  mpdparser_parse_root_node (MPDMpdNode **an_mpdNode, xmlNode * a_node)
   {
     xmlNode *cur_node;
     MPDMpdNode *new_mpd;
@@ -827,62 +791,106 @@ namespace android {
     *an_mpdNode = new_mpd = new MPDMpdNode();
 
     ALOGV ("namespaces of root MPD node:");
-    new_mpd->mDefault_namespace =
-      mpdparser_get_xml_node_namespace (a_node, NULL);
-    new_mpd->mNamespace_xsi = 
-      mpdparser_get_xml_node_namespace (a_node, "xsi");
-    new_mpd->mNamespace_ext = 
-      mpdparser_get_xml_node_namespace (a_node, "ext");
+
+    new_mpd->mDefault_namespace = mpdparser_get_xml_node_namespace (a_node, NULL);
+    new_mpd->mNamespace_xsi = mpdparser_get_xml_node_namespace (a_node, "xsi");
+    new_mpd->mNamespace_ext = mpdparser_get_xml_node_namespace (a_node, "ext");
 
     ALOGV ("attributes of root MPD node:");
     
-    mpdparser_get_xml_prop_string (a_node, "schemaLocation",
-				   &new_mpd->mSchemaLocation);
-    mpdparser_get_xml_prop_string (a_node, "id", 
-				   &new_mpd->mId);
-    mpdparser_get_xml_prop_string (a_node, "profiles", 
-				   &new_mpd->mProfiles);
-    mpdparser_get_xml_prop_type (a_node, "type", 
-				 &new_mpd->type);
-    mpdparser_get_xml_prop_dateTime (a_node, "availabilityStartTime",
-				     &new_mpd->mAvailabilityStartTime);
-    mpdparser_get_xml_prop_dateTime (a_node, "availabilityEndTime",
-				     &new_mpd->mAvailabilityEndTime);
+    mpdparser_get_xml_prop_string (a_node, "schemaLocation", &new_mpd->mSchemaLocation);
+    mpdparser_get_xml_prop_string (a_node, "id", &new_mpd->mId);
+    mpdparser_get_xml_prop_string (a_node, "profiles", &new_mpd->mProfiles);
+    mpdparser_get_xml_prop_type (a_node, "type", &new_mpd->type);
+    mpdparser_get_xml_prop_dateTime (a_node, "availabilityStartTime", &new_mpd->mAvailabilityStartTime);
+    mpdparser_get_xml_prop_dateTime (a_node, "availabilityEndTime", &new_mpd->mAvailabilityEndTime);
 
-    mpdparser_get_xml_prop_duration (a_node, "mediaPresentationDuration", -1,
-				     &new_mpd->mMediaPresentationDuration);
-    mpdparser_get_xml_prop_duration (a_node, "minimumUpdatePeriod", -1,
-				     &new_mpd->mMinimumUpdatePeriod);
-    mpdparser_get_xml_prop_duration (a_node, "minBufferTime", -1,
-				     &new_mpd->mMinBufferTime);
-    mpdparser_get_xml_prop_duration (a_node, "timeShiftBufferDepth", -1,
-				     &new_mpd->mTimeShiftBufferDepth);
-    mpdparser_get_xml_prop_duration (a_node, "suggestedPresentationDelay", -1,
-				     &new_mpd->mSuggestedPresentationDelay);
-    mpdparser_get_xml_prop_duration (a_node, "maxSegmentDuration", -1,
-				     &new_mpd->mMaxSegmentDuration);
-    mpdparser_get_xml_prop_duration (a_node, "maxSubsegmentDuration", -1,
-				     &new_mpd->mMaxSubsegmentDuration);
+    mpdparser_get_xml_prop_duration (a_node, "mediaPresentationDuration", -1, &new_mpd->mMediaPresentationDuration);
+    mpdparser_get_xml_prop_duration (a_node, "minimumUpdatePeriod", -1, &new_mpd->mMinimumUpdatePeriod);
+    mpdparser_get_xml_prop_duration (a_node, "minBufferTime", -1, &new_mpd->mMinBufferTime);
+    mpdparser_get_xml_prop_duration (a_node, "timeShiftBufferDepth", -1, &new_mpd->mTimeShiftBufferDepth);
+    mpdparser_get_xml_prop_duration (a_node, "suggestedPresentationDelay", -1, &new_mpd->mSuggestedPresentationDelay);
+    mpdparser_get_xml_prop_duration (a_node, "maxSegmentDuration", -1, &new_mpd->mMaxSegmentDuration);
+    mpdparser_get_xml_prop_duration (a_node, "maxSubsegmentDuration", -1, &new_mpd->mMaxSubsegmentDuration);
 
     /* explore children Period nodes */
     for (cur_node = a_node->children; cur_node; cur_node = cur_node->next)
       {
 	if (cur_node->type == XML_ELEMENT_NODE) 
 	  {
-	    if (xmlStrcmp (cur_node->name, (xmlChar *) "Period") == 0) {
-	      mpdparser_parse_period_node (&new_mpd->Periods, cur_node);
-	    } else if (xmlStrcmp (cur_node->name,
-				  (xmlChar *) "ProgramInformation") == 0) {
-	      gst_mpdparser_parse_program_info_node (&new_mpd->ProgramInfo, cur_node);
-	    } else if (xmlStrcmp (cur_node->name, (xmlChar *) "BaseURL") == 0) {
-	      gst_mpdparser_parse_baseURL_node (&new_mpd->BaseURLs, cur_node);
-	    } else if (xmlStrcmp (cur_node->name, (xmlChar *) "Location") == 0) {
-	      gst_mpdparser_parse_location_node (&new_mpd->Locations, cur_node);
-	    } else if (xmlStrcmp (cur_node->name, (xmlChar *) "Metrics") == 0) {
-	      gst_mpdparser_parse_metrics_node (&new_mpd->Metrics, cur_node);
-	    }
+	    if (xmlStrcmp (cur_node->name, (xmlChar *) "Period") == 0) 
+	      {
+		mpdparser_parse_period_node (&new_mpd->Periods, cur_node);
+	      } 
+	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "ProgramInformation") == 0) 
+	      {
+		gst_mpdparser_parse_program_info_node (&new_mpd->ProgramInfo, cur_node);
+	      } 
+	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "BaseURL") == 0) 
+	      {
+		gst_mpdparser_parse_baseURL_node (&new_mpd->BaseURLs, cur_node);
+	      } 
+	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "Location") == 0) 
+	      {
+		gst_mpdparser_parse_location_node (&new_mpd->Locations, cur_node);
+	      } 
+	    else if (xmlStrcmp (cur_node->name, (xmlChar *) "Metrics") == 0) 
+	      {
+		gst_mpdparser_parse_metrics_node (&new_mpd->Metrics, cur_node);
+	      }
 	  }
       }
+  }
+
+  MPDParser::MPDParser(
+	const char *baseURI, const void *data, size_t size)
+    : mInitCheck(NO_INIT),
+      mBaseURI(baseURI),
+      mIsComplete(false),
+      mIsEvent(false) {
+    mInitCheck = parse(data, size);
+  }
+
+  MPDParser::~MPDParser() {
+  }
+
+  status_t MPDParser::initCheck() const {
+    return mInitCheck;
+  }
+
+  bool MPDParser::isComplete() const {
+    return mIsComplete;
+  }
+  
+  bool MPDParser::isEvent() const {
+    return mIsEvent;
+  }
+
+  sp<AMessage> MPDParser::meta() {
+    return mMeta;
+  }
+
+  size_t MPDParser::size() {
+    return mItems.size();
+  }
+
+  bool MPDParser::itemAt(size_t index, AString *uri, sp<AMessage> *meta) {
+    if (uri) 
+      uri->clear();
+    
+    if (meta)
+      *meta = NULL;
+    
+    if (index >= mItems.size())
+      return false;
+    
+    if (uri)
+      *uri = mItems.itemAt(index).mURI;
+    
+    if (meta)
+      *meta = mItems.itemAt(index).mMeta;
+    
+    return true;
   }
 
   status_t MPDParser::parse(const void *_data, size_t size) 
@@ -930,7 +938,7 @@ namespace android {
 	    }
 	  else 
 	    /* now we can parse the MPD root node and all children nodes, recursively */
-	    parse_root_node (&mClient->mMpdNode, root_element);
+	    mpdparser_parse_root_node (&mClient->mMpdNode, root_element);
 	
 	  /* free the document */
 	  xmlFreeDoc (doc);

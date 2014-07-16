@@ -204,7 +204,7 @@ void NuPlayer::setDataSourceAsync(
     if (IsHTTPLiveURL(url)) {
         source = new HTTPLiveSource(notify, url, headers, mUIDValid, mUID);
     } else if (IsDashURL(url)) {
-        source = new DashSource(notify, url, headers, mUIDValid, mUID);
+        source = new DashMpdSource(notify, url, headers, mUIDValid, mUID);
     } else if (!strncasecmp(url, "rtsp://", 7)) {
         source = new RTSPSource(notify, url, headers, mUIDValid, mUID);
     } else if ((!strncasecmp(url, "http://", 7)
