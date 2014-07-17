@@ -18,16 +18,42 @@
 #define LOG_TAG "MPDParser"
 #include <utils/Log.h>
 
-#include "include/MPDParser.h"
-
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaErrors.h>
 
+#include "include/MPDParser.h"
+
 namespace android {
 
-  MPDParser::MPDParser(
-	const char *baseURI, const void *data, size_t size)
+  static bool        mpdparser_make_url (const char *baseURL, const char *url, AString *out);
+  static AString *   mpdparser_get_xml_node_namespace (xmlNode *a_node, const char *prefix);
+  static bool        mpdparser_get_xml_prop_dateTime (xmlNode * a_node, const char * property_name, 
+						      MPDDateTime ** property_value); 
+  static int64_t     mpdparser_convert_to_millisecs (int32_t decimals, int32_t pos);
+  static gboolean    mpdparser_get_xml_prop_duration (xmlNode * a_node, const gchar * property_name, 
+						      int64_t default_value, int64_t * property_value);
+  static bool        mpdparser_get_xml_prop_string (xmlNode * a_node, const char * property_name, 
+						    char ** property_value);
+  static bool        mpdparser_get_xml_prop_boolean (xmlNode * a_node, const char * property_name, 
+						     bool default_val, bool * property_value);
+  static MPDRange *  mpdparser_clone_range (MPDRange * range);
+  static MPDUrlType *mpdparser_clone_URL (MPDUrlType * url);
+  static bool        mpdparser_get_xml_prop_unsigned_integer (xmlNode * a_node, const char * property_name, 
+							      uint32_t default_val, uint32_t * property_value);
+  static bool        mpdparser_get_xml_prop_range (xmlNode * a_node, const char * property_name, 
+						   MPDRange ** property_value);
+  static void        mpdparser_parse_seg_base_type_ext (MPDSegmentBaseType ** pointer, xmlNode * a_node, 
+							MPDSegmentBaseType * parent);
+  static void        mpdparser_parse_period_node (GList ** list, xmlNode * a_node);
+  static void        mpdparser_parse_root_node (MPDMpdNode **an_mpdNode, xmlNode * a_node);
+
+
+  /*
+   * Public constructor for MPD parser. Triggers parsing of the MPD.
+   */
+  MPDParser::MPDParser(const char *baseURI, 
+		       const void *data, size_t size)
     : mInitCheck(NO_INIT),
       mBaseURI(baseURI),
       mIsComplete(false),
@@ -35,9 +61,18 @@ namespace android {
     mInitCheck = parse(data, size);
   }
 
+  /*
+   * Virtual desctructor
+   */
   MPDParser::~MPDParser() {
   }
 
+  /*
+   * Return OK if MPD was correctly parsed
+   * Once successfully parsed an object network is created as a 
+   * representation of the Media Presentation Description.
+   * This network allows to drive the streaming session (DashSession).
+   */
   status_t MPDParser::initCheck() const {
     return mInitCheck;
   }
@@ -83,7 +118,7 @@ namespace android {
   }
 
   static bool 
-  MakeURL(const char *baseURL, const char *url, AString *out) 
+  mpdparser_make_url(const char *baseURL, const char *url, AString *out) 
   {
     out->clear();
 
@@ -295,7 +330,7 @@ namespace android {
 
   /* this function computes decimals * 10 ^ (3 - pos) */
   static int64_t
-  convert_to_millisecs (gint decimals, gint pos)
+  mpdparser_convert_to_millisecs (int32_t decimals, int32_t pos)
   {
     int num = 1, den = 1, i = 3 - pos;
 
@@ -431,7 +466,7 @@ namespace android {
 		    if (have_ms) 
 		      {
 			/* we have read the decimal part of the seconds */
-			decimals = convert_to_millisecs (read, pos);
+			decimals = mpdparser_convert_to_millisecs (read, pos);
 			ALOGV ("decimal number %d (%d digits) -> %d ms", read, pos,
 			       decimals);
 		      } 
@@ -483,8 +518,8 @@ namespace android {
 
   static bool
   mpdparser_get_xml_prop_string (xmlNode * a_node,
-				 const gchar * property_name, 
-				 gchar ** property_value)
+				 const char * property_name, 
+				 char ** property_value)
   {
     xmlChar *prop_string;
     bool exists = FALSE;
@@ -669,11 +704,9 @@ namespace android {
     bool boolval;
     MPDRange *rangeval;
 
-    mpdparser_free_seg_base_type_ext (*pointer);
+    if (*pointer)
+      delete *pointer;
     *pointer = seg_base_type = new MPDSegmentBaseType();
-
-    /* Initialize values that have defaults */
-    seg_base_type->mIndexRangeExact = FALSE;
 
     /* Inherit attribute values from parent */
     if (parent) 
@@ -692,26 +725,21 @@ namespace android {
      * exist, we do not want to overwrite an inherited value 
      */
     ALOGV ("attributes of SegmentBaseType extension:");
-    if (mpdparser_get_xml_prop_unsigned_integer (a_node, "timescale", 0,
-						 &intval)) 
+    if (mpdparser_get_xml_prop_unsigned_integer (a_node, "timescale", 0, &intval)) 
       {
 	seg_base_type->mTimescale = intval;
       }
-    if (mpdparser_get_xml_prop_unsigned_integer (a_node,
-						 "presentationTimeOffset", 0, &intval)) 
+    if (mpdparser_get_xml_prop_unsigned_integer (a_node, "presentationTimeOffset", 0, &intval)) 
       {
 	seg_base_type->mPresentationTimeOffset = intval;
       }
     if (mpdparser_get_xml_prop_range (a_node, "indexRange", &rangeval)) 
       {
 	if (seg_base_type->indexRange) 
-	  {
-	    /*TBD*/ g_slice_free (GstRange, seg_base_type->indexRange);
-	  }
+	    delete seg_base_type->indexRange;
 	seg_base_type->mIndexRange = rangeval;
       }
-    if (mpdparser_get_xml_prop_boolean (a_node, "indexRangeExact",
-					FALSE, &boolval)) 
+    if (mpdparser_get_xml_prop_boolean (a_node, "indexRangeExact", FALSE, &boolval)) 
       {
 	seg_base_type->mIndexRangeExact = boolval;
       }
@@ -725,9 +753,8 @@ namespace android {
 		xmlStrcmp (cur_node->name, (xmlChar *) "Initialisation") == 0) 
 	      {
 		if (seg_base_type->Initialization) 
-		  {
-		    mpdparser_free_url_type_node (seg_base_type->mInitialization);
-		  }
+		    delete seg_base_type->mInitialization;
+
 		mpdparser_parse_url_type_node (&seg_base_type->mInitialization,
 					       cur_node);
 	      } 
@@ -735,9 +762,8 @@ namespace android {
 				(xmlChar *) "RepresentationIndex") == 0) 
 	      {
 		if (seg_base_type->mRepresentationIndex) 
-		  {
-		    mpdparser_free_url_type_node (seg_base_type->mRepresentationIndex);
-		  }
+		    delete seg_base_type->mRepresentationIndex;
+
 		mpdparser_parse_url_type_node (&seg_base_type->mRepresentationIndex,
 					       cur_node);
 	      }
@@ -746,7 +772,7 @@ namespace android {
   }
 
   static void
-  mpdparser_parse_period_node (GList ** list, xmlNode * a_node)
+  mpdparser_parse_period_node (vector<MPDPeriodNode> **list, xmlNode *a_node)
   {
     xmlNode *cur_node;
     MPDPeriodNode *new_period;
@@ -757,9 +783,14 @@ namespace android {
 	ALOGW ("Allocation of Period node failed!");
 	return;
       }
-    *list = g_list_append (*list, new_period);
+    if (!*list)
+      {
+	*list = new vector<MPDPeriodNode>();
+      }
+    vector<MPDPeriodNode>::iterator i =;
+    (*list)->push_back(new_period);
 
-    new_period->start = GST_CLOCK_TIME_NONE;
+    new_period->start = kClockTimeNone;
 
     ALOGV ("attributes of Period node:");
     mpdparser_get_xml_prop_string (a_node, "id", &new_period->mId);
@@ -767,7 +798,7 @@ namespace android {
     mpdparser_get_xml_prop_duration (a_node, "duration", -1,
 				     &new_period->mDuration);
     mpdparser_get_xml_prop_boolean (a_node, "bitstreamSwitching",
-				    FALSE, &new_period->bitstreamSwitching);
+				    FALSE, &new_period->mBitstreamSwitching);
 
     /* explore children nodes */
     for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
@@ -818,7 +849,7 @@ namespace android {
   }
   
   static void
-  parse_root_node (MPDMpdNode **an_mpdNode, xmlNode * a_node)
+  mpdparser_parse_root_node (MPDMpdNode **an_mpdNode, xmlNode * a_node)
   {
     xmlNode *cur_node;
     MPDMpdNode *new_mpd;
@@ -930,7 +961,7 @@ namespace android {
 	    }
 	  else 
 	    /* now we can parse the MPD root node and all children nodes, recursively */
-	    parse_root_node (&mClient->mMpdNode, root_element);
+	    mpdparser_parse_root_node (&mClient->mMpdNode, root_element);
 	
 	  /* free the document */
 	  xmlFreeDoc (doc);

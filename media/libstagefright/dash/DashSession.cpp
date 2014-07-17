@@ -195,7 +195,7 @@ namespace android {
       return;
     }
 
-    if (mpd->isDynamic()) {
+    if (mpd->size() > 1) {
       for (size_t i = 0; i < mpd->size(); ++i) {
 	BandwidthItem item;
 
@@ -364,13 +364,13 @@ namespace android {
     sp<MPDParser> mpd =
       new MPDParser(url, buffer->data(), buffer->size());
 
-    if (playlist->initCheck() != OK) {
+    if (mpd->initCheck() != OK) {
       ALOGE("failed to parse media presentation descriptor");
 
       return NULL;
     }
 
-    return playlist;
+    return mpd;
   }
 
   int64_t DashSession::getSegmentStartTimeUs(int32_t seqNumber) const {
@@ -577,26 +577,29 @@ namespace android {
       if (!mDurationFixed) {
 	Mutex::Autolock autoLock(mLock);
 
-	if (!mMpd->isComplete() && !mMpd->isEvent()) {
-	  mDurationUs = -1;
-	  mDurationFixed = true;
-	} else {
-	  mDurationUs = 0;
-	  for (size_t i = 0; i < mMpd->size(); ++i) {
-	    sp<AMessage> itemMeta;
-	    CHECK(mMpd->itemAt(
-				    i, NULL /* uri */, &itemMeta));
-
-	    int64_t itemDurationUs;
-	    CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
-
-	    mDurationUs += itemDurationUs;
+	if (!mMpd->isComplete() && !mMpd->isEvent()) 
+	  {
+	    mDurationUs = -1;
+	    mDurationFixed = true;
+	  } 
+	else 
+	  {
+	    mDurationUs = 0;
+	    for (size_t i = 0; i < mMpd->size(); ++i) 
+	      {
+		sp<AMessage> itemMeta;
+		CHECK(mMpd->itemAt(i, NULL /* uri */, &itemMeta));
+		
+		int64_t itemDurationUs;
+		CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
+		
+		mDurationUs += itemDurationUs;
+	      }
+	    
+	    mDurationFixed = mMpd->isComplete();
 	  }
-
-	  mDurationFixed = mMpd->isComplete();
-	}
       }
-
+      
       mLastMpdFetchTimeUs = ALooper::GetNowUs();
     }
 
@@ -1008,7 +1011,7 @@ namespace android {
 
     // buffer->setRange(buffer->offset(), n);
 
-    // return OK;
+    return OK;
   }
 
   void DashSession::postMonitorQueue(int64_t delayUs) {

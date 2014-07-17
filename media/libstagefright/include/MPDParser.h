@@ -26,11 +26,13 @@ namespace android
   
   class MPDParser : public RefBase
   {
+  public:
     MPDParser(const char *baseURI, const void *data, size_t size);
 
     status_t initCheck() const;
     
     bool isComplete() const;
+    bool isEvent() const {return false;};
 
     sp<AMessage> meta();
 
@@ -41,28 +43,31 @@ namespace android
     virtual ~MPDParser();
 
   private:
+
+    typedef int64_t MPDClockTime;
+
     /*
      * Stream type
      */
-    enum {
+    typedef enum MPDStreamMimeType_e {
       kStreamVideo,           /* video stream (the main one) */
       kStreamAudio,           /* audio stream (optional) */
       kStreamApplication      /* application stream (optional): for timed text/subtitles */
-    };
+    } MPDStreamMimeType;
 
     /*
      * MPD Type
      */
     enum {
-      kMpdTypeUninitialized,  /* No MPD@type */
-      kMpdTypeStatic,	      /* MPD@type == static */
+      kMpdTypeUninitialized,  /* No MPD@type         */
+      kMpdTypeStatic,	      /* MPD@type == static  */
       kMpdTypeDynamic         /* MPD@type == dynamic */
     };
 
     /*
      * SAP types
      */
-    enum {
+    typedef enum MPDSapType_e {
       kSapType_0 = 0,
       kSapType_1,
       kSapType_2,
@@ -70,6 +75,10 @@ namespace android
       kSapType_4,
       kSapType_5,
       kSapType_6
+    } MPDSapType;
+
+    enum {
+      kClockTimeNone = -1
     };
 
     /*
@@ -85,7 +94,7 @@ namespace android
       {};
 
       MPDBaseUrl(const char *baseUrl)
-	: mBaseUrl(baseUrl),
+	: mBaseUrl(new AString(baseUrl)),
 	  mServiceLocation(new AString("")),
 	  mByteRange(new AString("")) 
       {};
@@ -227,12 +236,12 @@ namespace android
     class MPDSegmentTimelineNode : public RefBase {
     public:
       MPDSegmentTimelineNode() 
-	: mSNodes(new vector<MPD_SNode *>()) 
+	: mSNodes(new vector<MPD_SNode>()) 
       {};
 
     protected:
       virtual ~MPDSegmentTimelineNode() {
-	mSNodes.clear();
+	mSNodes->clear();
 	delete mSNodes;
 	mSNodes = (vector<MPD_SNode> *)NULL;
       };
@@ -248,6 +257,10 @@ namespace android
      */
     class MPDUrlType : public RefBase {
     public:
+      MPDUrlType()
+	: mSourceUrl(AString("")),
+	  mRange(new MPDRange()) 
+      {};
       MPDUrlType(const char *sourceUrl, MPDRange*& range)
 	: mSourceUrl(sourceUrl),
 	  mRange(range) {
@@ -256,7 +269,8 @@ namespace android
 
     protected:
       virtual ~MPDUrlType () {
-	decStrong(range);
+	mSourceUrl.clear();
+	decStrong(mRange);
       };
 
     private:
@@ -276,20 +290,22 @@ namespace android
 	  mPresentationTimeOffset(0),
 	  mIndexRange(new MPDRange()),
 	  mIndexRangeExact(false),
-	  mInitialization("", new MPDRange()),
-	  mRepresentationIndex("", new MPDRange())
+	  mInitialization(new MPDUrlType()),
+	  mRepresentationIndex(new MPDUrlType())
+      {};
 
     protected:
       virtual ~MPDSegmentBaseType() {};
 
-    private:
+    public:
       uint32_t mTimescale;
       uint32_t mPresentationTimeOffset;
-      MPDRange &mIndexRange;
-      boolean mIndexRangeExact;
-      MPDUrlType &mInitialization;
-      MPDUrlType &mRepresentationIndex;
+      MPDRange *mIndexRange;
+      bool mIndexRangeExact;
+      MPDUrlType *mInitialization;
+      MPDUrlType *mRepresentationIndex;
 
+    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentBaseType);
     };
 
@@ -331,7 +347,7 @@ namespace android
 
     protected:
       virtual ~MPDSegmentListNode() {
-	mSegmentUrlNodes.clear();
+	mSegmentUrlNodes->clear();
 	delete mSegmentUrlNodes;
 	mSegmentUrlNodes = (vector<AString> *)NULL;
       };
@@ -402,7 +418,7 @@ namespace android
       uint32_t mHeight;
       MPDRatio *mSar;
       MPDFrameRate *mFrameRate;
-      AString *mAudioSamplingRate
+      AString *mAudioSamplingRate;
       AString *mMimeType;
       AString *mSegmentProfiles;
       AString *mCodecs;
@@ -442,7 +458,7 @@ namespace android
      */
     class MPDRepresentationNode : public RefBase {
     public:
-        gchar *id;
+      char *id;
       uint32_t mBandwidth;
       uint32_t mQualityRanking;
       vector<AString> *mDependencyId;              /* StringVectorType */
@@ -519,7 +535,7 @@ namespace android
       MPDFrameRate *mMaxFrameRate;
       MPDConditionalUintType *mSegmentAlignment;
       MPDConditionalUintType *mSubsegmentAlignment;
-      MPDSAPType mSubsegmentStartsWithSAP;
+      MPDSapType mSubsegmentStartsWithSAP;
       bool mBitstreamSwitching;
       /* list of Accessibility DescriptorType nodes */
       vector<MPDDescriptorType> *mAccessibility;
@@ -643,8 +659,8 @@ namespace android
 	  mMinute(0),
 	  mSecond(0)
       {};
-      MPDDateTime(uint16_t year, uint8_t month, uint8t day, 
-		  uint8t hour, uint8t minute, uint8t second)
+      MPDDateTime(uint16_t year, uint8_t month, uint8_t day, 
+		  uint8_t hour, uint8_t minute, uint8_t second)
 	: mYear(year),
 	  mMonth(month),
 	  mDay(day),
@@ -659,16 +675,15 @@ namespace android
 	mMonth = mDay = mHour = mMinute = mSecond = 0;
       };
 
-    protected:
       virtual ~MPDDateTime() {};
 
     private:
       uint16_t mYear;
-      uint8_t mMonth;
-      uint8_t mDay;
-      uint8_t mHour;
-      uint8_t mMinute;
-      uint8_t mSecond;
+      uint8_t  mMonth;
+      uint8_t  mDay;
+      uint8_t  mHour;
+      uint8_t  mMinute;
+      uint8_t  mSecond;
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDDateTime);
     };
@@ -732,34 +747,13 @@ namespace android
       
     protected:
       virtual ~MPDMpdNode() {
-	if (mDefault_namespace) {
-	  mDefault_namespace.clear(); delete mDefault_namespace; 
-	  mDefault_namespace = (AString *)NULL;
-	}
-	if (mNamespace_xsi) {
-	  mNamespace_xsi.clear(); delete mNamespace_xsi;
-	  mNamespace_xsi = (AString *)NULL;
-	}
-	if (mNamespace_ext) {
-	  mNamespace_ext.clear(); delete mNamespace_ext;
-	  mNamespace_ext = (AString *)NULL;
-	}
-	if (mSchemaLocation) {
-	  mSchemaLocation.clear(); delete mSchemaLocation;
-	  mSchemaLocation = (AString *)NULL;
-	}
-	if (mId) {
-	  mId.clear(); delete mId;
-	  mId = (AString *)NULL;
-	}
-	if (mProfiles) {
-	  mProfiles.clear(); delete mProfiles;
-	  mProfiles = (AString *)NULL;
-	}
-	if (mType) {
-	  mType.clear(); delete mType;
-	  mType = (AString *)NULL;
-	}
+	mDefault_namespace.clear();
+	mNamespace_xsi.clear();
+	mNamespace_ext.clear();
+	mSchemaLocation.clear();
+	mId.clear(); 
+	mProfiles.clear(); 
+	mType.clear(); 
 	mAvailabilityStartTime.clear();
 	mAvailabilityEndTime.clear();
 	mMediaPresentationDuration = 0L;
@@ -776,7 +770,7 @@ namespace android
 	  mLocations->clear(); delete mLocations; mLocations = (vector<AString> *)NULL;
 	}
 	if (mProgramInfo) {
-	  mProgramInfo->clear(); delete mProgramInfo; mProgramInfo = (vector<AString> *)NULL;
+	  mProgramInfo->clear(); delete mProgramInfo; //mProgramInfo = (vector<MPDProgramInformationNode> *)NULL;
 	}
 	if (mPeriods) {
 	  mPeriods->clear(); delete mPeriods; mPeriods = (vector<MPDPeriodNode> *)NULL;
