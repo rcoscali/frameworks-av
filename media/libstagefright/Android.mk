@@ -88,14 +88,14 @@ LOCAL_SRC_FILES:=                         \
         mp4/TrackFragment.cpp             \
         ExtendedExtractor.cpp             \
         QCUtils.cpp                       \
-        ResourceManager.cpp             \
+        ResourceManager.cpp
 
 LOCAL_C_INCLUDES:= \
         $(TOP)/frameworks/av/include/media/stagefright/timedtext \
-        $(TOP)/frameworks/native/include/media/hardware \
-        $(TOP)/frameworks/native/include/media/openmax \
-        $(TOP)/external/flac/include \
-        $(TOP)/external/tremolo \
+        $(TOP)/frameworks/native/include/media/hardware          \
+        $(TOP)/frameworks/native/include/media/openmax           \
+        $(TOP)/external/flac/include                             \
+        $(TOP)/external/tremolo                                  \
         $(TOP)/external/openssl/include
 
 ifneq ($(TI_CUSTOM_DOMX_PATH),)
@@ -106,7 +106,7 @@ LOCAL_C_INCLUDES += $(TOP)/frameworks/native/include/media/openmax
 endif
 
 ifeq ($(BOARD_USES_STE_FMRADIO),true)
-LOCAL_SRC_FILES += \
+LOCAL_SRC_FILES +=                        \
         FMRadioSource.cpp                 \
         PCMExtractor.cpp
 endif
@@ -141,43 +141,44 @@ LOCAL_C_INCLUDES += \
         $(TOP)/hardware/qcom/media/mm-core/inc
 endif
 
-LOCAL_SHARED_LIBRARIES := \
-        libbinder \
-        libcamera_client \
-        libcrypto \
-        libcutils \
-        libdl \
-        libdrmframework \
-        libexpat \
-        libgui \
-        libicui18n \
-        libicuuc \
-        liblog \
-        libmedia \
-        libsonivox \
-        libssl \
+LOCAL_SHARED_LIBRARIES :=  \
+        libbinder          \
+        libcamera_client   \
+        libcrypto          \
+        libcutils          \
+        libdl              \
+        libdrmframework    \
+        libexpat           \
+        libgui             \
+        libicui18n         \
+        libicuuc           \
+        liblog             \
+        libmedia           \
+        libsonivox         \
+        libssl             \
         libstagefright_omx \
         libstagefright_yuv \
-        libsync \
-        libui \
-        libutils \
-        libvorbisidec \
-        libz \
-        libaudioparameter \
+        libsync            \
+        libui              \
+        libutils           \
+        libvorbisidec      \
+        libz               \
+        libaudioparameter
 
-LOCAL_STATIC_LIBRARIES := \
+LOCAL_STATIC_LIBRARIES :=               \
         libstagefright_color_conversion \
-        libstagefright_mp3dec \
-        libstagefright_aacenc \
-        libstagefright_matroska \
-        libstagefright_timedtext \
-        libvpx \
-        libwebm \
-        libstagefright_mpeg2ts \
-        libstagefright_dash \
-        libstagefright_httplive \
-        libstagefright_id3 \
-        libFLAC \
+        libstagefright_mp3dec           \
+        libstagefright_aacenc           \
+        libstagefright_matroska         \
+        libstagefright_timedtext        \
+        libvpx                          \
+        libwebm                         \
+        libstagefright_mpeg2ts          \
+        libstagefright_dash             \
+        libstagefright_httplive         \
+        libstagefright_id3              \
+        libFLAC                         \
+	libxml2
 
 LOCAL_SRC_FILES += \
         chromium_http_stub.cpp
@@ -186,7 +187,7 @@ LOCAL_CPPFLAGS += -DCHROMIUM_AVAILABLE=1
 LOCAL_SHARED_LIBRARIES += libstlport
 include external/stlport/libstlport.mk
 
-LOCAL_SHARED_LIBRARIES += \
+LOCAL_SHARED_LIBRARIES +=         \
         libstagefright_enc_common \
         libstagefright_avc_common \
         libstagefright_foundation \

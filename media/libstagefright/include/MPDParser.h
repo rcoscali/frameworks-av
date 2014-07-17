@@ -26,11 +26,13 @@ namespace android
   
   class MPDParser : public RefBase
   {
+  public:
     MPDParser(const char *baseURI, const void *data, size_t size);
 
     status_t initCheck() const;
     
     bool isComplete() const;
+    bool isEvent() const;
 
     sp<AMessage> meta();
 
@@ -40,29 +42,30 @@ namespace android
   protected:
     virtual ~MPDParser();
 
-  private:
+  public:
+
     /*
      * Stream type
      */
-    enum {
+    typedef enum MPDStreamType_e {
       kStreamVideo,           /* video stream (the main one) */
       kStreamAudio,           /* audio stream (optional) */
       kStreamApplication      /* application stream (optional): for timed text/subtitles */
-    };
+    } MPDStreamType;
 
     /*
      * MPD Type
      */
-    enum {
+    typedef enum MPDMpdType_e {
       kMpdTypeUninitialized,  /* No MPD@type */
       kMpdTypeStatic,	      /* MPD@type == static */
       kMpdTypeDynamic         /* MPD@type == dynamic */
-    };
+    } MPDMpdType;
 
     /*
      * SAP types
      */
-    enum {
+    typedef enum MPDSapType_e {
       kSapType_0 = 0,
       kSapType_1,
       kSapType_2,
@@ -70,14 +73,14 @@ namespace android
       kSapType_4,
       kSapType_5,
       kSapType_6
-    };
+    } MPDSapType;
 
     /*
      * Specific ClockTime values
      */
-    enum {
+    typedef enum MPDClockTime_e {
       kClockTimeNone = -1
-    };
+    } MPDClockTime;
 
     /*
      * MPDBaseUrl
@@ -92,12 +95,11 @@ namespace android
       {};
 
       MPDBaseUrl(const char *baseUrl)
-	: mBaseUrl(baseUrl),
+	: mBaseUrl(new AString(baseUrl)),
 	  mServiceLocation(new AString("")),
 	  mByteRange(new AString("")) 
       {};
 
-    protected:
       virtual ~MPDBaseUrl() {
 	delete mBaseUrl; mBaseUrl = (AString *)NULL;
 	delete mServiceLocation; mServiceLocation = (AString *)NULL;
@@ -109,6 +111,7 @@ namespace android
       AString *mServiceLocation;
       AString *mByteRange;
       
+    public:
       DISALLOW_EVIL_CONSTRUCTORS(MPDBaseUrl);
     };
 
@@ -128,13 +131,12 @@ namespace android
 	  mLastBytePos(lastBytePos) 
       {};
 
-    protected:
       virtual ~MPDRange() {};
 
-    private:
       uint64_t mFirstBytePos;
       uint64_t mLastBytePos;
 
+    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDRange);
     };
 
@@ -155,10 +157,8 @@ namespace android
 	  mDen = 1;
       };
 
-    protected:
       virtual ~MPDRatio() {};
 
-    private:
       uint32_t mNum;
       uint32_t mDen;
 
@@ -178,10 +178,7 @@ namespace android
 	: MPDRatio(num, den) 
       {};
 
-    protected:
       virtual ~MPDFrameRate() {};
-
-    private:
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDFrameRate);
     };
@@ -191,18 +188,22 @@ namespace android
      */
     class MPDConditionalUintType : public RefBase {
     public:
+      MPDConditionalUintType()
+	: mFlag(false),
+	  mValue(0) 
+      {};
       MPDConditionalUintType(bool flag, uint32_t value)
 	: mFlag(flag),
 	  mValue(value) 
       {};
 
-    protected:
       virtual ~MPDConditionalUintType() {};
 
     private:
       bool mFlag;
       uint32_t mValue;
 
+    public:
       DISALLOW_EVIL_CONSTRUCTORS(MPDConditionalUintType);
     };
 
@@ -216,8 +217,6 @@ namespace android
 	  mD(d),
 	  mR(r) 
       {};
-
-    protected:
       virtual ~MPD_SNode() {};
 
     private:
@@ -225,6 +224,7 @@ namespace android
       uint64_t mD;
       uint32_t mR;
 
+    public:
       DISALLOW_EVIL_CONSTRUCTORS(MPD_SNode);
     };
 
@@ -234,12 +234,12 @@ namespace android
     class MPDSegmentTimelineNode : public RefBase {
     public:
       MPDSegmentTimelineNode() 
-	: mSNodes(new vector<MPD_SNode *>()) 
+	: mSNodes(new vector<MPD_SNode>()) 
       {};
 
     protected:
       virtual ~MPDSegmentTimelineNode() {
-	mSNodes.clear();
+	mSNodes->clear();
 	delete mSNodes;
 	mSNodes = (vector<MPD_SNode> *)NULL;
       };
@@ -255,21 +255,24 @@ namespace android
      */
     class MPDUrlType : public RefBase {
     public:
-      MPDUrlType(const char *sourceUrl, MPDRange*& range)
+      MPDUrlType()
+	: mSourceUrl(AString("")),
+	  mRange() 
+      {};
+      MPDUrlType(const char *sourceUrl, MPDRange* range)
 	: mSourceUrl(sourceUrl),
 	  mRange(range) {
 	incStrong(range);
       };
 
-    protected:
       virtual ~MPDUrlType () {
-	decStrong(range);
+	decStrong(mRange);
       };
 
-    private:
       AString mSourceUrl;
       MPDRange *mRange;
 
+    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDUrlType);
     };
 
@@ -283,20 +286,21 @@ namespace android
 	  mPresentationTimeOffset(0),
 	  mIndexRange(new MPDRange()),
 	  mIndexRangeExact(false),
-	  mInitialization("", new MPDRange()),
-	  mRepresentationIndex("", new MPDRange())
+	  mInitialization(new MPDUrlType()),
+	  mRepresentationIndex(new MPDUrlType())
+      {};
 
-    protected:
       virtual ~MPDSegmentBaseType() {};
 
-    private:
+    public:
       uint32_t mTimescale;
       uint32_t mPresentationTimeOffset;
-      MPDRange &mIndexRange;
-      boolean mIndexRangeExact;
-      MPDUrlType &mInitialization;
-      MPDUrlType &mRepresentationIndex;
+      MPDRange *mIndexRange;
+      bool mIndexRangeExact;
+      MPDUrlType *mInitialization;
+      MPDUrlType *mRepresentationIndex;
 
+    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentBaseType);
     };
 
@@ -336,14 +340,13 @@ namespace android
 	  mSegmentUrlNodes(new vector<AString>())
       {};
 
-    protected:
-      virtual ~MPDSegmentListNode() {
-	mSegmentUrlNodes.clear();
+      virtual ~MPDSegmentListNode() 
+      {
+	mSegmentUrlNodes->clear();
 	delete mSegmentUrlNodes;
 	mSegmentUrlNodes = (vector<AString> *)NULL;
       };
 
-    private:
       MPDMultSegmentBaseType *mMultSegBaseType;
       vector<AString> *mSegmentUrlNodes;
       
@@ -354,6 +357,7 @@ namespace android
      * MPDSegmentTemplateNode
      */
     class MPDSegmentTemplateNode : public RefBase {
+    public:
       MPDSegmentTemplateNode()
 	: mMultSegBaseType(),
 	  mMedia(),
@@ -362,10 +366,8 @@ namespace android
 	  mBitstreamSwitching()
       {};
 
-    protected:
       virtual ~MPDSegmentTemplateNode() {};
 
-    private:
       MPDMultSegmentBaseType *mMultSegBaseType;
       AString *mMedia;
       AString *mIndex;
@@ -404,25 +406,43 @@ namespace android
      */
     class MPDRepresentationBaseType : public RefBase {
     public:
-      AString *mProfiles;
+      MPDRepresentationBaseType()
+	: mProfiles(vector<AString>()),
+	  mWidth(0),
+	  mHeight(0),
+	  mSar(new MPDRatio()),
+	  mFrameRate(new MPDFrameRate()),
+	  mAudioSamplingRate(vector<AString>()),
+	  mMimeType(vector<AString>()),
+	  mSegmentProfiles(vector<AString>()),
+	  mCodecs(vector<AString>()),
+	  mMaximumSAPPeriod(0.0),
+	  mStartWithSAP(kSapType_0),
+	  mMaxPlayoutRate(0.0),
+	  mCodingDependency(false),
+	  mScanType(vector<AString>()),
+	  mFramePacking(vector<AString>()),
+	  mAudioChannelConfiguration(vector<AString>()),
+	  mContentProtection(vector<AString>())
+      {};
+
+      vector<AString> mProfiles;
       uint32_t mWidth;
       uint32_t mHeight;
       MPDRatio *mSar;
       MPDFrameRate *mFrameRate;
-      AString *mAudioSamplingRate
-      AString *mMimeType;
-      AString *mSegmentProfiles;
-      AString *mCodecs;
+      vector<AString> mAudioSamplingRate;
+      vector<AString> mMimeType;
+      vector<AString> mSegmentProfiles;
+      vector<AString> mCodecs;
       double mMaximumSAPPeriod;
       MPDSapType mStartWithSAP;
       double mMaxPlayoutRate;
       bool mCodingDependency;
-      AString *mScanType;
-      vector<AString> *mFramePacking;
-      vector<AString> *mAudioChannelConfiguration;
-      vector<AString> *mContentProtection;
-
-    private:
+      vector<AString> mScanType;
+      vector<AString> mFramePacking;
+      vector<AString> mAudioChannelConfiguration;
+      vector<AString> mContentProtection;
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDRepresentationBaseType);
     };
@@ -432,14 +452,25 @@ namespace android
      */
     class MPDSubRepresentationNode : public RefBase {
     public:
+      MPDSubRepresentationNode()
+	: mRepresentationBase(new MPDRepresentationBaseType()),
+	  mLevel(0),
+	  mDependencyLevel(vector<uint32_t>()),
+	  mSize(0),
+	  mBandwidth(0),
+	  mContentComponent(vector<AString>())
+      {};
+
+      virtual ~MPDSubRepresentationNode() {
+	delete mRepresentationBase; mRepresentationBase = (MPDRepresentationBaseType *)NULL;
+      };
+
       MPDRepresentationBaseType *mRepresentationBase;
       uint32_t mLevel;
-      vector<uint32_t> *mDependencyLevel;
+      vector<uint32_t> mDependencyLevel;
       uint32_t mSize;
       uint32_t mBandwidth;
-      vector<AString> *mContentComponent;
-
-    private:
+      vector<AString> mContentComponent;
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDSubRepresentationNode);
     };
@@ -449,17 +480,39 @@ namespace android
      */
     class MPDRepresentationNode : public RefBase {
     public:
-        gchar *id;
+      MPDRepresentationNode()
+	: mId(AString("")),
+	  mBandwidth(0),
+	  mQualityRanking(0),
+	  mDependencyId(vector<AString>()),
+	  mMediaStreamStructureId(vector<AString>()),
+	  mRepresentationBase(new MPDRepresentationBaseType()),
+	  mBaseURLs(vector<AString>()),
+	  mSubRepresentations(vector<AString>()),
+	  mSegmentBase(new MPDSegmentBaseType()),
+	  mSegmentTemplate(new MPDSegmentTemplateNode()),
+	  mSegmentList(new MPDSegmentListNode())
+      {};
+
+      virtual ~MPDRepresentationNode() {
+	delete mRepresentationBase; mRepresentationBase = (MPDRepresentationBaseType *)NULL;
+	delete mSegmentBase; mSegmentBase = (MPDSegmentBaseType *)NULL;
+	delete mSegmentTemplate; mSegmentTemplate = (MPDSegmentTemplateNode *)NULL;
+	delete mSegmentList; mSegmentList = (MPDSegmentListNode *)NULL;
+      };
+
+
+      AString mId;
       uint32_t mBandwidth;
       uint32_t mQualityRanking;
-      vector<AString> *mDependencyId;              /* StringVectorType */
-      vector<AString> *mMediaStreamStructureId;    /* StringVectorType */
+      vector<AString> mDependencyId;              /* StringVectorType */
+      vector<AString> mMediaStreamStructureId;    /* StringVectorType */
       /* RepresentationBase extension */
       MPDRepresentationBaseType *mRepresentationBase;
       /* list of BaseURL nodes */
-      vector<AString> *mBaseURLs;
+      vector<AString> mBaseURLs;
       /* list of SubRepresentation nodes */
-      vector<AString> *mSubRepresentations;
+      vector<AString> mSubRepresentations;
       /* SegmentBase node */
       MPDSegmentBaseType *mSegmentBase;
       /* SegmentTemplate node */
@@ -467,7 +520,6 @@ namespace android
       /* SegmentList node */
       MPDSegmentListNode *mSegmentList;
 
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDRepresentationNode);
     };
 
@@ -476,10 +528,17 @@ namespace android
      */
     class MPDDescriptorType : public RefBase {
     public:
+      MPDDescriptorType()
+	: mSchemeIdUri(AString("")),
+	  mValue(AString(""))
+      {};
+
+      virtual ~MPDDescriptorType()
+      {};
+
       AString mSchemeIdUri;
       AString mValue;
 
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDDescriptorType);
     };
 
@@ -488,20 +547,35 @@ namespace android
      */
     class MPDContentComponentNode : public RefBase {
     public:
+      MPDContentComponentNode()
+	: mId(0),
+	  mLang(vector<AString>()),
+	  mContentType(vector<AString>()),
+	  mPar(new MPDRatio()),
+	  mAccessibility(vector<MPDDescriptorType>()),
+	  mRole(vector<MPDDescriptorType>()),
+	  mRating(vector<MPDDescriptorType>()),
+	  mViewpoint(vector<MPDDescriptorType>())
+      {};
+
+      virtual ~MPDContentComponentNode() 
+      {
+	delete mPar; mPar = (MPDRatio *)NULL;
+      };
+
       uint32_t mId;
       vector<AString> mLang;                      /* LangVectorType RFC 5646 */
-      AString *mContentType;
+      vector<AString> mContentType;
       MPDRatio *mPar;
       /* list of Accessibility DescriptorType nodes */
-      vector<MPDDescriptorType> *mAccessibility;
+      vector<MPDDescriptorType> mAccessibility;
       /* list of Role DescriptorType nodes */
-      vector<MPDDescriptorType> *mRole;
+      vector<MPDDescriptorType> mRole;
       /* list of Rating DescriptorType nodes */
-      vector<MPDDescriptorType> *mRating;
+      vector<MPDDescriptorType> mRating;
       /* list of Viewpoint DescriptorType nodes */
-      vector<MPDDescriptorType> *mViewpoint;
+      vector<MPDDescriptorType> mViewpoint;
 
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDContentComponentNode);
     };
 
@@ -510,6 +584,48 @@ namespace android
      */
     class MPDAdaptationSetNode : public RefBase {
     public:
+      MPDAdaptationSetNode()
+	: mId(0),
+	  mGroup(0),
+	  mLang(AString("")),
+	  mContentType(AString("")),
+	  mPar(new MPDRatio()),
+	  mMinBandwidth(0),
+	  mMaxBandwidth(0),
+	  mMinWidth(0),
+	  mMaxWidth(0),
+	  mMinHeight(0),
+	  mMaxHeight(0),
+	  mMinFrameRate(new MPDFrameRate()),
+	  mMaxFrameRate(new MPDFrameRate()),
+	  mSegmentAlignment(new MPDConditionalUintType()),
+	  mSubsegmentAlignment(new MPDConditionalUintType()),
+	  mSubsegmentStartsWithSAP(kSapType_0),
+	  mBitstreamSwitching(false),
+	  mAccessibility(vector<MPDDescriptorType>()),
+	  mRole(vector<MPDDescriptorType>()),
+	  mRating(vector<MPDDescriptorType>()),
+  	  mViewpoint(vector<MPDDescriptorType>()),
+	  mRepresentationBase(MPDRepresentationBaseType()),
+	  mSegmentBase(new MPDSegmentBaseType()),
+	  mSegmentList(new MPDSegmentListNode()),
+	  mSegmentTemplate(new MPDSegmentTemplateNode()),
+	  mBaseURLs(vector<MPDBaseUrl>()),
+	  mRepresentations(vector<MPDRepresentationNode>()),
+	  mContentComponents(vector<MPDContentComponentNode>())
+        {};
+
+      virtual ~MPDAdaptationSetNode()
+      {
+	delete mPar; mPar = (MPDRatio *)NULL;
+	delete mMinFrameRate; mMinFrameRate = (MPDFrameRate *)NULL;
+	delete mMaxFrameRate; mMaxFrameRate = (MPDFrameRate *)NULL;
+	delete mSegmentAlignment; mSegmentAlignment = (MPDConditionalUintType *)NULL;
+	delete mSubsegmentAlignment; mSubsegmentAlignment = (MPDConditionalUintType *)NULL;
+	delete mSegmentBase; mSegmentBase = (MPDSegmentBaseType *)NULL;
+	delete mSegmentList; mSegmentList = (MPDSegmentListNode *)NULL;
+	delete mSegmentTemplate; mSegmentTemplate = (MPDSegmentTemplateNode *)NULL;
+      };
 
       uint32_t mId;
       uint32_t mGroup;
@@ -526,18 +642,18 @@ namespace android
       MPDFrameRate *mMaxFrameRate;
       MPDConditionalUintType *mSegmentAlignment;
       MPDConditionalUintType *mSubsegmentAlignment;
-      MPDSAPType mSubsegmentStartsWithSAP;
+      MPDSapType mSubsegmentStartsWithSAP;
       bool mBitstreamSwitching;
       /* list of Accessibility DescriptorType nodes */
-      vector<MPDDescriptorType> *mAccessibility;
+      vector<MPDDescriptorType> mAccessibility;
       /* list of Role DescriptorType nodes */
-      vector<MPDDescriptorType> *mRole;
+      vector<MPDDescriptorType> mRole;
       /* list of Rating DescriptorType nodes */
-      vector<MPDDescriptorType> *mRating;
+      vector<MPDDescriptorType> mRating;
       /* list of Viewpoint DescriptorType nodes */
-      vector<MPDDescriptorType> *mViewpoint;
+      vector<MPDDescriptorType> mViewpoint;
       /* RepresentationBase extension */
-      MPDRepresentationBaseType *mRepresentationBase;
+      MPDRepresentationBaseType mRepresentationBase;
       /* SegmentBase node */
       MPDSegmentBaseType *mSegmentBase;
       /* SegmentList node */
@@ -545,13 +661,12 @@ namespace android
       /* SegmentTemplate node */
       MPDSegmentTemplateNode *mSegmentTemplate;
       /* list of BaseURL nodes */
-      vector<MPDBaseUrl> *mBaseURLs;
+      vector<MPDBaseUrl> mBaseURLs;
       /* list of Representation nodes */
-      vector<MPDRepresentationNode> *mRepresentations;
+      vector<MPDRepresentationNode> mRepresentations;
       /* list of ContentComponent nodes */
-      vector<MPDContentComponentNode> *mContentComponents;
+      vector<MPDContentComponentNode> mContentComponents;
       
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDAdaptationSetNode);
     };
 
@@ -571,7 +686,21 @@ namespace android
      * MPDPeriodNode
      */
     class MPDPeriodNode : public RefBase {
+
     public:
+      MPDPeriodNode()
+	: mId(AString("")),
+	  mStart(0L),
+	  mDuration(0L),
+	  mBitstreamSwitching(false),
+	  mSegmentBase(new MPDSegmentBaseType()),
+	  mSegmentList(new MPDSegmentListNode()),
+	  mSegmentTemplate(new MPDSegmentTemplateNode()),
+	  mAdaptationSets(vector<MPDAdaptationSetNode>()),
+	  mSubsets(vector<MPDRepresentationNode>()),
+	  mBaseURLs(vector<MPDBaseUrl>())
+      {};
+
       AString mId;
       int64_t mStart;                      /* [ms] */
       int64_t mDuration;                   /* [ms] */
@@ -583,13 +712,12 @@ namespace android
       /* SegmentTemplate node */
       MPDSegmentTemplateNode *mSegmentTemplate;
       /* list of Adaptation Set nodes */
-      vector<MPDAdaptationSetNode> AdaptationSets;
+      vector<MPDAdaptationSetNode> mAdaptationSets;
       /* list of Representation nodes */
       vector<MPDRepresentationNode> mSubsets;
       /* list of BaseURL nodes */
       vector<MPDBaseUrl> mBaseURLs;
 
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDPeriodNode);
     };
 
@@ -605,7 +733,6 @@ namespace android
       AString mSource;
       AString mCopyright;
       
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDProgramInformationNode);
     };
 
@@ -617,7 +744,6 @@ namespace android
       int64_t mStarttime;                  /* [ms] */
       int64_t mDuration;                   /* [ms] */
       
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDMetricsRangeNode);
     };
 
@@ -632,7 +758,6 @@ namespace android
       /* list of Reporting nodes */
       vector<MPDDescriptorType> mReportings;
       
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDMetricsNode);
     };
 
@@ -650,8 +775,8 @@ namespace android
 	  mMinute(0),
 	  mSecond(0)
       {};
-      MPDDateTime(uint16_t year, uint8_t month, uint8t day, 
-		  uint8t hour, uint8t minute, uint8t second)
+      MPDDateTime(uint16_t year, uint8_t month, uint8_t day, 
+		  uint8_t hour, uint8_t minute, uint8_t second)
 	: mYear(year),
 	  mMonth(month),
 	  mDay(day),
@@ -666,7 +791,6 @@ namespace android
 	mMonth = mDay = mHour = mMinute = mSecond = 0;
       };
 
-    protected:
       virtual ~MPDDateTime() {};
 
     private:
@@ -738,35 +862,16 @@ namespace android
       vector<MPDMetricsNode> *mMetrics;
       
     protected:
-      virtual ~MPDMpdNode() {
-	if (mDefault_namespace) {
-	  mDefault_namespace.clear(); delete mDefault_namespace; 
-	  mDefault_namespace = (AString *)NULL;
-	}
-	if (mNamespace_xsi) {
-	  mNamespace_xsi.clear(); delete mNamespace_xsi;
-	  mNamespace_xsi = (AString *)NULL;
-	}
-	if (mNamespace_ext) {
-	  mNamespace_ext.clear(); delete mNamespace_ext;
-	  mNamespace_ext = (AString *)NULL;
-	}
-	if (mSchemaLocation) {
-	  mSchemaLocation.clear(); delete mSchemaLocation;
-	  mSchemaLocation = (AString *)NULL;
-	}
-	if (mId) {
-	  mId.clear(); delete mId;
-	  mId = (AString *)NULL;
-	}
-	if (mProfiles) {
-	  mProfiles.clear(); delete mProfiles;
-	  mProfiles = (AString *)NULL;
-	}
-	if (mType) {
-	  mType.clear(); delete mType;
-	  mType = (AString *)NULL;
-	}
+      virtual ~MPDMpdNode() 
+      {
+	mDefault_namespace.clear(); 
+	mNamespace_xsi.clear(); 
+	mNamespace_ext.clear(); 
+	mSchemaLocation.clear(); 
+	mId.clear(); 
+	mProfiles.clear(); 
+	mType.clear(); 
+	
 	mAvailabilityStartTime.clear();
 	mAvailabilityEndTime.clear();
 	mMediaPresentationDuration = 0L;
@@ -776,21 +881,26 @@ namespace android
 	mSuggestedPresentationDelay = 0L;
 	mMaxSegmentDuration = 0L;
 	mMaxSubsegmentDuration = 0L;
-	if (mBaseURLs) {
-	  mBaseURLs->clear(); delete mBaseURLs; mBaseURLs = (vector<MPDBaseUrl> *)NULL;
-	}
-	if (mLocations) {
-	  mLocations->clear(); delete mLocations; mLocations = (vector<AString> *)NULL;
-	}
-	if (mProgramInfo) {
-	  mProgramInfo->clear(); delete mProgramInfo; mProgramInfo = (vector<AString> *)NULL;
-	}
-	if (mPeriods) {
-	  mPeriods->clear(); delete mPeriods; mPeriods = (vector<MPDPeriodNode> *)NULL;
-	}
-	if (mMetrics) {
-	  mMetrics->clear(); delete mMetrics; mMetrics = (vector<MPDMetricsNode> *)NULL;
-	}
+	if (mBaseURLs) 
+	  {
+	    mBaseURLs->clear(); delete mBaseURLs; mBaseURLs = (vector<MPDBaseUrl> *)NULL;
+	  }
+	if (mLocations) 
+	  {
+	    mLocations->clear(); delete mLocations; mLocations = (vector<AString> *)NULL;
+	  }
+	if (mProgramInfo) 
+	  {
+	    mProgramInfo->clear(); delete mProgramInfo; mProgramInfo = (vector<MPDProgramInformationNode> *)0;
+	  }
+	if (mPeriods) 
+	  {
+	    mPeriods->clear(); delete mPeriods; mPeriods = (vector<MPDPeriodNode> *)NULL;
+	  }
+	if (mMetrics) 
+	  {
+	    mMetrics->clear(); delete mMetrics; mMetrics = (vector<MPDMetricsNode> *)NULL;
+	  }
       };
 
     private:
@@ -852,7 +962,7 @@ namespace android
      */
     class MPDActiveStream : public RefBase {
     public:
-      MPDStreamMimeType mimeType;                 /* video/audio/application */
+      MPDStreamType mimeType;                     /* video/audio/application */
 
       uint32_t mBaseUrlIdx;                       /* index of the baseURL used for last request */
       AString mBaseUrl;                           /* active baseURL used for last request */

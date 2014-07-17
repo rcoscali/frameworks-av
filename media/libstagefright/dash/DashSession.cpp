@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include <stdint.h>
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+
 #define LOG_NDEBUG 0
 #define LOG_TAG "DashSession"
 #include <utils/Log.h>
@@ -195,13 +199,15 @@ namespace android {
       return;
     }
 
-    if (mpd->isDynamic()) {
-      for (size_t i = 0; i < mpd->size(); ++i) {
-	BandwidthItem item;
-
-	sp<AMessage> meta;
-	mpd->itemAt(i, &item.mURI, &meta);
-
+    if (mpd->size() > 1) 
+      {
+	for (size_t i = 0; i < mpd->size(); ++i) 
+	  {
+	    BandwidthItem item;
+	    
+	    sp<AMessage> meta;
+	    mpd->itemAt(i, &item.mURI, &meta);
+	    
 	unsigned long bandwidth;
 	CHECK(meta->findInt32("bandwidth", (int32_t *)&item.mBandwidth));
 
@@ -364,13 +370,13 @@ namespace android {
     sp<MPDParser> mpd =
       new MPDParser(url, buffer->data(), buffer->size());
 
-    if (playlist->initCheck() != OK) {
+    if (mpd->initCheck() != OK) {
       ALOGE("failed to parse media presentation descriptor");
 
       return NULL;
     }
 
-    return playlist;
+    return mpd;
   }
 
   int64_t DashSession::getSegmentStartTimeUs(int32_t seqNumber) const {
@@ -536,7 +542,8 @@ namespace android {
     return mLastMpdFetchTimeUs + minMpdAgeUs <= nowUs;
   }
 
-  void DashSession::onDownloadNext() {
+  void DashSession::onDownloadNext() 
+  {
     size_t bandwidthIndex = getBandwidthIndex();
 
   rinse_repeat:
@@ -544,324 +551,372 @@ namespace android {
 
     if (mLastMpdFetchTimeUs < 0
 	|| (ssize_t)bandwidthIndex != mPrevBandwidthIndex
-	|| (!mMpd->isComplete() && timeToRefreshMpd(nowUs))) {
-      AString url;
-      if (mBandwidthItems.size() > 0) {
-	url = mBandwidthItems.editItemAt(bandwidthIndex).mURI;
-      } else {
-	url = mMasterURL;
-      }
-
-      if ((ssize_t)bandwidthIndex != mPrevBandwidthIndex) {
-	// If we switch bandwidths, do not pay any heed to whether
-	// playlists changed since the last time...
-	mMpd.clear();
-      }
-
-      bool unchanged;
-      sp<MPDParser> playlist = fetchMpd(url.c_str(), &unchanged);
-      if (playlist == NULL) {
-	if (unchanged) {
-	  // We succeeded in fetching the playlist, but it was
-	  // unchanged from the last time we tried.
-	} else {
-	  ALOGE("failed to load playlist at url '%s'", url.c_str());
-	  signalEOS(ERROR_IO);
-
-	  return;
-	}
-      } else {
-	mMpd = playlist;
-      }
-
-      if (!mDurationFixed) {
-	Mutex::Autolock autoLock(mLock);
-
-	if (!mMpd->isComplete() && !mMpd->isEvent()) {
-	  mDurationUs = -1;
-	  mDurationFixed = true;
-	} else {
-	  mDurationUs = 0;
-	  for (size_t i = 0; i < mMpd->size(); ++i) {
-	    sp<AMessage> itemMeta;
-	    CHECK(mMpd->itemAt(
-				    i, NULL /* uri */, &itemMeta));
-
-	    int64_t itemDurationUs;
-	    CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
-
-	    mDurationUs += itemDurationUs;
+	|| (!mMpd->isComplete() && timeToRefreshMpd(nowUs))) 
+      {
+	AString url;
+	if (mBandwidthItems.size() > 0) 
+	  {
+	    url = mBandwidthItems.editItemAt(bandwidthIndex).mURI;
+	  } 
+	else 
+	  {
+	    url = mMasterURL;
 	  }
 
-	  mDurationFixed = mMpd->isComplete();
-	}
+	if ((ssize_t)bandwidthIndex != mPrevBandwidthIndex) 
+	  {
+	    // If we switch bandwidths, do not pay any heed to whether
+	    // MPD changed since the last time...
+	    mMpd.clear();
+	  }
+
+	bool unchanged;
+	sp<MPDParser> mpd = fetchMpd(url.c_str(), &unchanged);
+	if (mpd == NULL) 
+	  {
+	    if (unchanged) 
+	      {
+		// We succeeded in fetching the MPD, but it was
+		// unchanged from the last time we tried.
+	      } 
+	    else 
+	      {
+		ALOGE("failed to load MPD at url '%s'", url.c_str());
+		signalEOS(ERROR_IO);
+		
+		return;
+	      }
+	  } 
+	else 
+	  {
+	    mMpd = mpd;
+	  }
+
+	if (!mDurationFixed) 
+	  {
+	    Mutex::Autolock autoLock(mLock);
+	    
+	    if (!mMpd->isComplete() && !mMpd->isEvent()) 
+	      {
+		mDurationUs = -1;
+		mDurationFixed = true;
+	      } 
+	    else 
+	      {
+		mDurationUs = 0;
+		for (size_t i = 0; i < mMpd->size(); ++i) 
+		  {
+		    sp<AMessage> itemMeta;
+		    CHECK(mMpd->itemAt(i, NULL /* uri */, &itemMeta));
+		    
+		    int64_t itemDurationUs;
+		    CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
+
+		    mDurationUs += itemDurationUs;
+		  }
+		
+		mDurationFixed = mMpd->isComplete();
+	      }
+	  }
+
+	mLastMpdFetchTimeUs = ALooper::GetNowUs();
       }
 
-      mLastMpdFetchTimeUs = ALooper::GetNowUs();
-    }
-
     int32_t firstSeqNumberInMpd;
-    if (mMpd->meta() == NULL || !mMpd->meta()->findInt32(
-								   "media-sequence", &firstSeqNumberInMpd)) {
-      firstSeqNumberInMpd = 0;
-    }
+    if (mMpd->meta() == NULL || 
+	!mMpd->meta()->findInt32("media-sequence", &firstSeqNumberInMpd)) 
+      {
+	firstSeqNumberInMpd = 0;
+      }
 
     bool seekDiscontinuity = false;
     bool explicitDiscontinuity = false;
     bool bandwidthChanged = false;
 
-    if (mSeekTimeUs >= 0) {
-      if (mMpd->isComplete() || mMpd->isEvent()) {
-	size_t index = 0;
-	int64_t segmentStartUs = 0;
-	while (index < mMpd->size()) {
-	  sp<AMessage> itemMeta;
-	  CHECK(mMpd->itemAt(
-				  index, NULL /* uri */, &itemMeta));
+    if (mSeekTimeUs >= 0) 
+      {
+	if (mMpd->isComplete() || mMpd->isEvent()) 
+	  {
+	    size_t index = 0;
+	    int64_t segmentStartUs = 0;
+	    while (index < mMpd->size()) 
+	      {
+		sp<AMessage> itemMeta;
+		CHECK(mMpd->itemAt(index, NULL /* uri */, &itemMeta));
+		
+		int64_t itemDurationUs;
+		CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
 
-	  int64_t itemDurationUs;
-	  CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
+		if (mSeekTimeUs < segmentStartUs + itemDurationUs) 
+		  {
+		    break;
+		  }
 
-	  if (mSeekTimeUs < segmentStartUs + itemDurationUs) {
-	    break;
+		segmentStartUs += itemDurationUs;
+		++index;
+	      }
+
+	    if (index < mMpd->size()) 
+	      {
+		int32_t newSeqNumber = firstSeqNumberInMpd + index;
+
+		ALOGI("seeking to seq no %d", newSeqNumber);
+
+		mSeqNumber = newSeqNumber;
+		
+		mDataSource->reset();
+
+		// reseting the data source will have had the
+		// side effect of discarding any previously queued
+		// bandwidth change discontinuity.
+		// Therefore we'll need to treat these seek
+		// discontinuities as involving a bandwidth change
+		// even if they aren't directly.
+		seekDiscontinuity = true;
+		bandwidthChanged = true;
+	      }
 	  }
-
-	  segmentStartUs += itemDurationUs;
-	  ++index;
-	}
-
-	if (index < mMpd->size()) {
-	  int32_t newSeqNumber = firstSeqNumberInMpd + index;
-
-	  ALOGI("seeking to seq no %d", newSeqNumber);
-
-	  mSeqNumber = newSeqNumber;
-
-	  mDataSource->reset();
-
-	  // reseting the data source will have had the
-	  // side effect of discarding any previously queued
-	  // bandwidth change discontinuity.
-	  // Therefore we'll need to treat these seek
-	  // discontinuities as involving a bandwidth change
-	  // even if they aren't directly.
-	  seekDiscontinuity = true;
-	  bandwidthChanged = true;
-	}
+	
+	mSeekTimeUs = -1;
+	
+	Mutex::Autolock autoLock(mLock);
+	mSeekDone = true;
+	mCondition.broadcast();
       }
-
-      mSeekTimeUs = -1;
-
-      Mutex::Autolock autoLock(mLock);
-      mSeekDone = true;
-      mCondition.broadcast();
-    }
 
     const int32_t lastSeqNumberInMpd =
       firstSeqNumberInMpd + (int32_t)mMpd->size() - 1;
 
-    if (mSeqNumber < 0) {
-      if (mMpd->isComplete()) {
-	mSeqNumber = firstSeqNumberInMpd;
-      } else {
-	// If this is a live session, start 3 segments from the end.
-	mSeqNumber = lastSeqNumberInMpd - 3;
-	if (mSeqNumber < firstSeqNumberInMpd) {
-	  mSeqNumber = firstSeqNumberInMpd;
-	}
-      }
-    }
-
-    if (mSeqNumber < firstSeqNumberInMpd
-	|| mSeqNumber > lastSeqNumberInMpd) {
-      if (mPrevBandwidthIndex != (ssize_t)bandwidthIndex) {
-	// Go back to the previous bandwidth.
-
-	ALOGI("new bandwidth does not have the sequence number "
-	      "we're looking for, switching back to previous bandwidth");
-
-	mLastMpdFetchTimeUs = -1;
-	bandwidthIndex = mPrevBandwidthIndex;
-	goto rinse_repeat;
+    if (mSeqNumber < 0) 
+      {
+	if (mMpd->isComplete()) 
+	  {
+	    mSeqNumber = firstSeqNumberInMpd;
+	  } 
+	else
+	  {
+	    // If this is a live session, start 3 segments from the end.
+	    mSeqNumber = lastSeqNumberInMpd - 3;
+	    if (mSeqNumber < firstSeqNumberInMpd) 
+	      {
+		mSeqNumber = firstSeqNumberInMpd;
+	      }
+	  }
       }
 
-      if (!mMpd->isComplete() && mNumRetries < kMaxNumRetries) {
-	++mNumRetries;
+    if (mSeqNumber < firstSeqNumberInMpd ||
+	mSeqNumber > lastSeqNumberInMpd) 
+      {
+	if (mPrevBandwidthIndex != (ssize_t)bandwidthIndex) 
+	  {
+	    // Go back to the previous bandwidth.
 
-	if (mSeqNumber > lastSeqNumberInMpd) {
-	  mLastMpdFetchTimeUs = -1;
-	  postMonitorQueue(3000000ll);
-	  return;
-	}
+	    ALOGI("new bandwidth does not have the sequence number "
+		  "we're looking for, switching back to previous bandwidth");
 
-	// we've missed the boat, let's start from the lowest sequence
-	// number available and signal a discontinuity.
+	    mLastMpdFetchTimeUs = -1;
+	    bandwidthIndex = mPrevBandwidthIndex;
+	    goto rinse_repeat;
+	  }
 
-	ALOGI("We've missed the boat, restarting playback.");
-	mSeqNumber = lastSeqNumberInMpd;
-	explicitDiscontinuity = true;
+	if (!mMpd->isComplete() && mNumRetries < kMaxNumRetries) 
+	  {
+	    ++mNumRetries;
 
-	// fall through
-      } else {
-	ALOGE("Cannot find sequence number %d in playlist "
-	      "(contains %d - %d)",
-	      mSeqNumber, firstSeqNumberInMpd,
-	      firstSeqNumberInMpd + mMpd->size() - 1);
+	    if (mSeqNumber > lastSeqNumberInMpd) 
+	      {
+		mLastMpdFetchTimeUs = -1;
+		postMonitorQueue(3000000ll);
+		return;
+	      }
 
-	signalEOS(ERROR_END_OF_STREAM);
-	return;
+	    // we've missed the boat, let's start from the lowest sequence
+	    // number available and signal a discontinuity.
+	    
+	    ALOGI("We've missed the boat, restarting playback.");
+	    mSeqNumber = lastSeqNumberInMpd;
+	    explicitDiscontinuity = true;
+	    
+	    // fall through
+	  } 
+	else
+	  {
+	    ALOGE("Cannot find sequence number %d in playlist "
+		  "(contains %d - %d)",
+		  mSeqNumber, firstSeqNumberInMpd,
+		  firstSeqNumberInMpd + mMpd->size() - 1);
+	    
+	    signalEOS(ERROR_END_OF_STREAM);
+	    return;
+	  }
       }
-    }
 
     mNumRetries = 0;
 
     AString uri;
     sp<AMessage> itemMeta;
-    CHECK(mMpd->itemAt(
-			    mSeqNumber - firstSeqNumberInMpd,
-			    &uri,
-			    &itemMeta));
+    CHECK(mMpd->itemAt(mSeqNumber - firstSeqNumberInMpd,
+		       &uri,
+		       &itemMeta));
 
     int32_t val;
-    if (itemMeta->findInt32("discontinuity", &val) && val != 0) {
-      explicitDiscontinuity = true;
-    }
-
+    if (itemMeta->findInt32("discontinuity", &val) && val != 0) 
+      {
+	explicitDiscontinuity = true;
+      }
+    
     int64_t range_offset, range_length;
-    if (!itemMeta->findInt64("range-offset", &range_offset)
-	|| !itemMeta->findInt64("range-length", &range_length)) {
-      range_offset = 0;
-      range_length = -1;
-    }
+    if (!itemMeta->findInt64("range-offset", &range_offset) ||
+	!itemMeta->findInt64("range-length", &range_length)) 
+      {
+	range_offset = 0;
+	range_length = -1;
+      }
 
     ALOGV("fetching segment %d from (%d .. %d)",
           mSeqNumber, firstSeqNumberInMpd, lastSeqNumberInMpd);
 
     sp<ABuffer> buffer;
     status_t err = fetchFile(uri.c_str(), &buffer, range_offset, range_length);
-    if (err != OK) {
-      ALOGE("failed to fetch .ts segment at url '%s'", uri.c_str());
-      signalEOS(err);
-      return;
-    }
+    if (err != OK) 
+      {
+	ALOGE("failed to fetch .ts segment at url '%s'", uri.c_str());
+	signalEOS(err);
+	return;
+      }
 
     CHECK(buffer != NULL);
 
     err = decryptBuffer(mSeqNumber - firstSeqNumberInMpd, buffer);
 
-    if (err != OK) {
-      ALOGE("decryptBuffer failed w/ error %d", err);
+    if (err != OK) 
+      {
+	ALOGE("decryptBuffer failed w/ error %d", err);
 
-      signalEOS(err);
-      return;
-    }
-
-    if (buffer->size() == 0 || buffer->data()[0] != 0x47) {
-      // Not a transport stream???
-
-      ALOGE("This doesn't look like a transport stream...");
-
-      mBandwidthItems.removeAt(bandwidthIndex);
-
-      if (mBandwidthItems.isEmpty()) {
-	signalEOS(ERROR_UNSUPPORTED);
+	signalEOS(err);
 	return;
       }
 
-      ALOGI("Retrying with a different bandwidth stream.");
+    if (buffer->size() == 0 || buffer->data()[0] != 0x47) 
+      {
+	// Not a transport stream???
 
-      mLastMpdFetchTimeUs = -1;
-      bandwidthIndex = getBandwidthIndex();
-      mPrevBandwidthIndex = bandwidthIndex;
-      mSeqNumber = -1;
+	ALOGE("This doesn't look like a transport stream...");
 
-      goto rinse_repeat;
-    }
+	mBandwidthItems.removeAt(bandwidthIndex);
+	
+	if (mBandwidthItems.isEmpty()) 
+	  {
+	    signalEOS(ERROR_UNSUPPORTED);
+	    return;
+	  }
 
-    if ((size_t)mPrevBandwidthIndex != bandwidthIndex) {
-      bandwidthChanged = true;
-    }
+	ALOGI("Retrying with a different bandwidth stream.");
+	
+	mLastMpdFetchTimeUs = -1;
+	bandwidthIndex = getBandwidthIndex();
+	mPrevBandwidthIndex = bandwidthIndex;
+	mSeqNumber = -1;
 
-    if (mPrevBandwidthIndex < 0) {
-      // Don't signal a bandwidth change at the very beginning of
-      // playback.
-      bandwidthChanged = false;
-    }
-
-    if (mStartOfPlayback) {
-      seekDiscontinuity = true;
-      mStartOfPlayback = false;
-    }
-
-    if (seekDiscontinuity || explicitDiscontinuity || bandwidthChanged) {
-      // Signal discontinuity.
-
-      ALOGI("queueing discontinuity (seek=%d, explicit=%d, bandwidthChanged=%d)",
-	    seekDiscontinuity, explicitDiscontinuity, bandwidthChanged);
-
-      sp<ABuffer> tmp = new ABuffer(188);
-      memset(tmp->data(), 0, tmp->size());
-
-      // signal a 'hard' discontinuity for explicit or bandwidthChanged.
-      uint8_t type = (explicitDiscontinuity || bandwidthChanged) ? 1 : 0;
-
-      if (mMpd->isComplete() || mMpd->isEvent()) {
-	// If this was a live event this made no sense since
-	// we don't have access to all the segment before the current
-	// one.
-	int64_t segmentStartTimeUs = getSegmentStartTimeUs(mSeqNumber);
-	memcpy(tmp->data() + 2, &segmentStartTimeUs, sizeof(segmentStartTimeUs));
-
-	type |= 2;
+	goto rinse_repeat;
       }
 
-      tmp->data()[1] = type;
+    if ((size_t)mPrevBandwidthIndex != bandwidthIndex) 
+      {
+	bandwidthChanged = true;
+      }
 
-      mDataSource->queueBuffer(tmp);
-    }
+    if (mPrevBandwidthIndex < 0) 
+      {
+	// Don't signal a bandwidth change at the very beginning of
+	// playback.
+	bandwidthChanged = false;
+      }
+
+    if (mStartOfPlayback) 
+      {
+	seekDiscontinuity = true;
+	mStartOfPlayback = false;
+      }
+
+    if (seekDiscontinuity || explicitDiscontinuity || bandwidthChanged) 
+      {
+	// Signal discontinuity.
+
+	ALOGI("queueing discontinuity (seek=%d, explicit=%d, bandwidthChanged=%d)",
+	      seekDiscontinuity, explicitDiscontinuity, bandwidthChanged);
+
+	sp<ABuffer> tmp = new ABuffer(188);
+	memset(tmp->data(), 0, tmp->size());
+
+	// signal a 'hard' discontinuity for explicit or bandwidthChanged.
+	uint8_t type = (explicitDiscontinuity || bandwidthChanged) ? 1 : 0;
+	
+	if (mMpd->isComplete() || mMpd->isEvent()) 
+	  {
+	    // If this was a live event this made no sense since
+	    // we don't have access to all the segment before the current
+	    // one.
+	    int64_t segmentStartTimeUs = getSegmentStartTimeUs(mSeqNumber);
+	    memcpy(tmp->data() + 2, &segmentStartTimeUs, sizeof(segmentStartTimeUs));
+	    
+	    type |= 2;
+	  }
+
+	tmp->data()[1] = type;
+
+	mDataSource->queueBuffer(tmp);
+      }
 
     mDataSource->queueBuffer(buffer);
-
+    
     mPrevBandwidthIndex = bandwidthIndex;
     ++mSeqNumber;
-
+    
     postMonitorQueue();
   }
 
-  void DashSession::signalEOS(status_t err) {
-    if (mInPreparationPhase && mNotify != NULL) {
-      sp<AMessage> notify = mNotify->dup();
+  void DashSession::signalEOS(status_t err) 
+  {
+    if (mInPreparationPhase && mNotify != NULL) 
+      {
+	sp<AMessage> notify = mNotify->dup();
 
-      notify->setInt32(
-		       "what",
-		       err == ERROR_END_OF_STREAM
-		       ? kWhatPrepared : kWhatPreparationFailed);
+	notify->setInt32("what", 
+			 err == ERROR_END_OF_STREAM ? kWhatPrepared : kWhatPreparationFailed);
+	
+	if (err != ERROR_END_OF_STREAM) 
+	  {
+	    notify->setInt32("err", err);
+	  }
 
-      if (err != ERROR_END_OF_STREAM) {
-	notify->setInt32("err", err);
+	notify->post();
+
+	mInPreparationPhase = false;
       }
-
-      notify->post();
-
-      mInPreparationPhase = false;
-    }
 
     mDataSource->queueEOS(err);
   }
 
-  void DashSession::onMonitorQueue() {
-    if (mSeekTimeUs >= 0
-	|| mDataSource->countQueuedBuffers() < kMaxNumQueuedFragments) {
-      onDownloadNext();
-    } else {
-      if (mInPreparationPhase) {
-	if (mNotify != NULL) {
-	  sp<AMessage> notify = mNotify->dup();
-	  notify->setInt32("what", kWhatPrepared);
-	  notify->post();
-	}
+  void DashSession::onMonitorQueue() 
+  {
+    if (mSeekTimeUs >= 0 ||
+	mDataSource->countQueuedBuffers() < kMaxNumQueuedFragments) 
+      {
+	onDownloadNext();
+      } 
+    else
+      {
+	if (mInPreparationPhase) 
+	  {
+	    if (mNotify != NULL) 
+	      {
+		sp<AMessage> notify = mNotify->dup();
+		notify->setInt32("what", kWhatPrepared);
+		notify->post();
+	      }
 
-	mInPreparationPhase = false;
+	    mInPreparationPhase = false;
       }
 
       postMonitorQueue(1000000ll);
@@ -1008,39 +1063,44 @@ namespace android {
 
     // buffer->setRange(buffer->offset(), n);
 
-    // return OK;
+    return OK;
   }
 
-  void DashSession::postMonitorQueue(int64_t delayUs) {
+  void DashSession::postMonitorQueue(int64_t delayUs) 
+  {
     sp<AMessage> msg = new AMessage(kWhatMonitorQueue, id());
     msg->setInt32("generation", ++mMonitorQueueGeneration);
     msg->post(delayUs);
   }
 
-  void DashSession::onSeek(const sp<AMessage> &msg) {
+  void DashSession::onSeek(const sp<AMessage> &msg) 
+  {
     int64_t timeUs;
     CHECK(msg->findInt64("timeUs", &timeUs));
-
+    
     mSeekTimeUs = timeUs;
     postMonitorQueue();
   }
 
-  status_t DashSession::getDuration(int64_t *durationUs) const {
+  status_t DashSession::getDuration(int64_t *durationUs) const 
+  {
     Mutex::Autolock autoLock(mLock);
     *durationUs = mDurationUs;
-
+    
     return OK;
   }
 
-  bool DashSession::isSeekable() const {
+  bool DashSession::isSeekable() const 
+  {
     int64_t durationUs;
     return getDuration(&durationUs) == OK && durationUs >= 0;
   }
-
-  bool DashSession::hasDynamicDuration() const {
+  
+  bool DashSession::hasDynamicDuration() const 
+  {
     return !mDurationFixed;
   }
-
+  
 }  // namespace android
 
 // Local Variables:
