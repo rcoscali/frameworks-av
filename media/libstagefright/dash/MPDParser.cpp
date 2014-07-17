@@ -61,7 +61,8 @@ namespace android {
   static void        mpdparser_parse_period_node       (vector<MPDParser::MPDPeriodNode> **, xmlNode *);
   static void        mpdparser_parse_root_node         (MPDParser::MPDMpdNode **, xmlNode *);
   static void        mpdparser_parse_url_type_node     (MPDParser::MPDUrlType **, xmlNode *);
-  static void        mpdparser_parse_segment_list_node (MPDSegmentListNode **, xmlNode *, MPDSegmentListNode *);
+  static void        mpdparser_parse_segment_list_node (MPDParser::MPDSegmentListNode **, xmlNode *, MPDParser::MPDSegmentListNode *);
+  static void        mpdparser_parse_mult_seg_base_type_ext (MPDParser::MPDMultSegmentBaseType **, xmlNode *, MPDParser::MPDMultSegmentBaseType *);
 
   /* Memory mngt */
   static MPDParser::MPDRange* 
@@ -756,6 +757,94 @@ namespace android {
       }
   }
 
+static GstSegmentURLNode *
+gst_mpdparser_clone_segment_url (GstSegmentURLNode * seg_url)
+{
+  GstSegmentURLNode *clone = NULL;
+
+  if (seg_url) {
+    clone = g_slice_new0 (GstSegmentURLNode);
+    if (clone) {
+      clone->media = xmlMemStrdup (seg_url->media);
+      clone->mediaRange = gst_mpdparser_clone_range (seg_url->mediaRange);
+      clone->index = xmlMemStrdup (seg_url->index);
+      clone->indexRange = gst_mpdparser_clone_range (seg_url->indexRange);
+    } else {
+      GST_WARNING ("Allocation of SegmentURL node failed!");
+    }
+  }
+
+  return clone;
+}
+
+  static void
+  gst_mpdparser_parse_mult_seg_base_type_ext (GstMultSegmentBaseType **pointer,
+					      xmlNode *a_node, GstMultSegmentBaseType *parent)
+  {
+    xmlNode *cur_node;
+    GstMultSegmentBaseType *mult_seg_base_type;
+    guint intval;
+
+    delete *pointer;
+    *pointer = mult_seg_base_type = new MPDMultSegmentBaseType();
+    if (mult_seg_base_type != NULL) 
+      {
+	/* Inherit attribute values from parent */
+	if (parent) 
+	  {
+	    mult_seg_base_type->mDuration = parent->mDuration;
+	    mult_seg_base_type->mStartNumber = parent->mStartNumber;
+	    mult_seg_base_type->mSegmentTimeline =
+	      mpdparser_clone_segment_timeline (parent->mSegmentTimeline);
+	    mult_seg_base_type->mBitstreamSwitching =
+	      mpdparser_clone_URL (parent->mBitstreamSwitching);
+	  }
+	
+	ALOGV ("attributes of MultipleSegmentBaseType extension:");
+
+	if (mpdparser_get_xml_prop_unsigned_integer (a_node, "duration", 0, &intval)) 
+	  {
+	    mult_seg_base_type->mDuration = intval;
+	  }
+	if (mpdparser_get_xml_prop_unsigned_integer (a_node, "startNumber", 1, &intval)) 
+	  {
+	    mult_seg_base_type->mStartNumber = intval;
+	  }
+	
+	ALOGV ("extension of MultipleSegmentBaseType extension:");
+	mpdparser_parse_seg_base_type_ext (&mult_seg_base_type->SegBaseType, a_node, 
+					   (parent ? parent->SegBaseType : NULL));
+	
+	/* explore children nodes */
+	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
+	  {
+	    if (cur_node->type == XML_ELEMENT_NODE) 
+	      {
+		if (xmlStrcmp (cur_node->name, (xmlChar *)"SegmentTimeline") == 0) 
+		  {
+		    if (mult_seg_base_type->SegmentTimeline) 
+		      {
+			mpdparser_free_segment_timeline_node(mult_seg_base_type->mSegmentTimeline);
+		      }
+		    mpdparser_parse_segment_timeline_node(&mult_seg_base_type->mSegmentTimeline, cur_node);
+		  }
+		else if (xmlStrcmp (cur_node->name, (xmlChar *)"BitstreamSwitching") == 0) 
+		  {
+		    if (mult_seg_base_type->mBitstreamSwitching) 
+		      {
+			mpdparser_free_url_type_node(mult_seg_base_type->mBitstreamSwitching);
+		      }
+		    mpdparser_parse_url_type_node(&mult_seg_base_type->mBitstreamSwitching, cur_node);
+		  }
+	      }
+	  }
+      }
+    else
+      ALOGW ("Allocation of MultipleSegmentBaseType node failed!");
+
+    return;
+  }
+
   static void
   mpdparser_parse_segment_list_node (MPDSegmentListNode **pointer,
 				     xmlNode *a_node, MPDSegmentListNode *parent)
@@ -770,31 +859,30 @@ namespace android {
 	/* Inherit attribute values from parent */
 	if (parent) 
 	  {
-	    vector<MPDSegmentUrlNode> *list;
+	    vector<AString> *list = parent->mSegmentUrlNodes;
 	    MPDSegmentUrlNode *seg_url;
-	    for (list = g_list_first (parent->SegmentURL); list;
-		 list = g_list_next (list)) 
+	    for (vector<AString>::iterator it = list->begin();
+		 it != list->end();
+		 it++)
 	      {
-		seg_url = (GstSegmentURLNode *) list->data;
+		seg_url = (GstSegmentURLNode *)(*it);
 		new_segment_list->SegmentURL =
-		  g_list_append (new_segment_list->SegmentURL,
-				 gst_mpdparser_clone_segment_url (seg_url));
+		  new_segment_list->mSegmentUrlNodes->push_back(mpdparser_clone_segment_url (seg_url));
 	      }
 	  }
 	
 	ALOGV ("extension of SegmentList node:");
-	mpdparser_parse_mult_seg_base_type_ext(&new_segment_list->MultSegBaseType, 
-					       a_node,
-					       (parent ? parent->MultSegBaseType : NULL));
+	mpdparser_parse_mult_seg_base_type_ext(&new_segment_list->mMultSegBaseType, a_node,
+					       (parent ? parent->mMultSegBaseType : NULL));
 	
-	/* explore children nodes */
+	/* Explore children nodes */
 	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
 	  {
 	    if (cur_node->type == XML_ELEMENT_NODE) 
 	      {
-		if (xmlStrcmp (cur_node->name, (xmlChar *) "SegmentURL") == 0) 
+		if (xmlStrcmp (cur_node->name, (xmlChar *)"SegmentURL") == 0) 
 		  {
-		    mpdparser_parse_segment_url_node (&new_segment_list->SegmentURL, cur_node);
+		    mpdparser_parse_segment_url_node (&new_segment_list->mSegmentUrlNodes, cur_node);
 		  }
 	      }
 	  }
