@@ -217,15 +217,27 @@ namespace android
 	  mD(d),
 	  mR(r) 
       {};
+      MPD_SNode(const MPD_SNode &rhv)
+	: RefBase(),
+	  mT(rhv.mT),
+	  mD(rhv.mD),
+	  mR(rhv.mR) 
+      {};
       virtual ~MPD_SNode() {};
 
-    private:
       uint64_t mT;
       uint64_t mD;
       uint32_t mR;
+      
+      MPD_SNode & operator=(const MPD_SNode &rhv)
+      {
+	this->mT = rhv.mT;
+	this->mD = rhv.mD;
+	this->mR = rhv.mR;
+	return *this;
+      };
 
-    public:
-      DISALLOW_EVIL_CONSTRUCTORS(MPD_SNode);
+      //      DISALLOW_EVIL_CONSTRUCTORS(MPD_SNode);
     };
 
     /*
@@ -237,14 +249,12 @@ namespace android
 	: mSNodes(new vector<MPD_SNode>()) 
       {};
 
-    protected:
       virtual ~MPDSegmentTimelineNode() {
 	mSNodes->clear();
 	delete mSNodes;
 	mSNodes = (vector<MPD_SNode> *)NULL;
       };
 
-    private:
       vector<MPD_SNode> *mSNodes;
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentTimelineNode);
@@ -317,10 +327,8 @@ namespace android
 	  mBitstreamSwitching(new MPDUrlType())
       {};
 
-    protected:
       virtual ~MPDMultSegmentBaseType() {};
 
-    private:
       uint32_t mDuration;
       uint32_t mStartNumber;
       MPDSegmentBaseType *mSegmentBaseType;
@@ -337,18 +345,18 @@ namespace android
     public:
       MPDSegmentListNode()
 	: mMultSegBaseType(new MPDMultSegmentBaseType()),
-	  mSegmentUrlNodes(new vector<AString>())
+	  mSegmentUrlNodes(new vector<MPDSegmentUrlNode>())
       {};
 
       virtual ~MPDSegmentListNode() 
       {
 	mSegmentUrlNodes->clear();
 	delete mSegmentUrlNodes;
-	mSegmentUrlNodes = (vector<AString> *)NULL;
+	mSegmentUrlNodes = (vector<MPDSegmentUrlNode> *)NULL;
       };
 
       MPDMultSegmentBaseType *mMultSegBaseType;
-      vector<AString> *mSegmentUrlNodes;
+      vector<MPDSegmentUrlNode> *mSegmentUrlNodes;
       
       DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentListNode);
     };
@@ -378,27 +386,25 @@ namespace android
     };
 
     /*
-     * MPDSegmentURLNode
+     * MPDSegmentUrlNode
      */
-    class MPDSegmentURLNode : public RefBase {
+    class MPDSegmentUrlNode : public RefBase {
     public:
-      MPDSegmentURLNode()
+      MPDSegmentUrlNode()
 	: mMedia(),
 	  mMediaRange(),
 	  mIndex(),
 	  mIndexRange()
       {};
 
-    protected:
-      virtual ~MPDSegmentURLNode() {};
+      virtual ~MPDSegmentUrlNode() {};
 
-    private:
       AString *mMedia;
       MPDRange *mMediaRange;
       AString *mIndex;
       MPDRange *mIndexRange;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentURLNode);
+      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentUrlNode);
     };
 
     /*
@@ -926,7 +932,7 @@ namespace android
      */
     class MPDMediaSegment : public RefBase {
     public:
-      MPDSegmentURLNode *mSegmentURL;              /* this is NULL when using a SegmentTemplate */
+      MPDSegmentUrlNode *mSegmentURL;              /* this is NULL when using a SegmentTemplate */
       uint32_t mNumber;                            /* segment number */
       uint64_t mStart;                             /* segment start time in timescale units */
       MPDClockTime mStart_time;                    /* segment start time */

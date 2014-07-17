@@ -54,6 +54,7 @@ namespace android {
   static bool        mpdparser_get_xml_prop_string     (xmlNode *, const char *, AString *);
   static bool        mpdparser_get_xml_prop_boolean    (xmlNode *, const char *, bool, bool *);
   static bool        mpdparser_get_xml_prop_uint       (xmlNode *, const char *, uint32_t, uint32_t *);
+  static bool        mpdparser_get_xml_prop_uint64     (xmlNode *, const char *, uint64_t, uint64_t *);
   static bool        mpdparser_get_xml_prop_range      (xmlNode *, const char *, MPDParser::MPDRange **);
 
   /* Elements */
@@ -63,12 +64,17 @@ namespace android {
   static void        mpdparser_parse_url_type_node     (MPDParser::MPDUrlType **, xmlNode *);
   static void        mpdparser_parse_segment_list_node (MPDParser::MPDSegmentListNode **, xmlNode *, MPDParser::MPDSegmentListNode *);
   static void        mpdparser_parse_mult_seg_base_type_ext (MPDParser::MPDMultSegmentBaseType **, xmlNode *, MPDParser::MPDMultSegmentBaseType *);
+  static void        mpdparser_parse_segment_timeline_node (MPDParser::MPDSegmentTimelineNode **, xmlNode *);
 
   /* Memory mngt */
   static MPDParser::MPDRange* 
                      mpdparser_clone_range             (MPDParser::MPDRange *);
   static MPDParser::MPDUrlType*
                      mpdparser_clone_URL               (MPDParser::MPDUrlType *);
+  static MPDParser::MPDSegmentUrlNode *
+                     mpdparser_clone_segment_url       (MPDParser::MPDSegmentUrlNode *);
+  static MPDParser::MPDSegmentTimelineNode *
+                     mpdparser_clone_segment_timeline  (MPDParser::MPDSegmentTimelineNode *);
 
 
   /*
@@ -588,11 +594,8 @@ namespace android {
 	    ALOGV (" - %s: %u", property_name, *property_value);
 	  }
 	else
-	  {
-	    ALOGW("failed to parse unsigned integer property "
-		  "%s from xml string %s",
-		  property_name, prop_string);
-	  }
+	  ALOGW("failed to parse unsigned integer property %s from "
+		"xml string %s", property_name, prop_string);
 	
 	xmlFree (prop_string);
       }
@@ -757,36 +760,131 @@ namespace android {
       }
   }
 
-static GstSegmentURLNode *
-gst_mpdparser_clone_segment_url (GstSegmentURLNode * seg_url)
-{
-  GstSegmentURLNode *clone = NULL;
+  static MPDParser::MPDSegmentUrlNode *
+  mpdparser_clone_segment_url (MPDParser::MPDSegmentUrlNode *seg_url)
+  {
+    MPDParser::MPDSegmentUrlNode *clone = NULL;
 
-  if (seg_url) {
-    clone = g_slice_new0 (GstSegmentURLNode);
-    if (clone) {
-      clone->media = xmlMemStrdup (seg_url->media);
-      clone->mediaRange = gst_mpdparser_clone_range (seg_url->mediaRange);
-      clone->index = xmlMemStrdup (seg_url->index);
-      clone->indexRange = gst_mpdparser_clone_range (seg_url->indexRange);
-    } else {
-      GST_WARNING ("Allocation of SegmentURL node failed!");
-    }
+    if (seg_url) 
+      {
+	clone = new MPDParser::MPDSegmentUrlNode();
+	if (clone) 
+	  {
+	    clone->mMedia = new AString(xmlMemStrdup (seg_url->mMedia->c_str()));
+	    clone->mMediaRange = mpdparser_clone_range (seg_url->mMediaRange);
+	    clone->mIndex = new AString(xmlMemStrdup (seg_url->mIndex->c_str()));
+	    clone->mIndexRange = mpdparser_clone_range (seg_url->mIndexRange);
+	  } 
+	else 
+	  ALOGW ("Allocation of SegmentURL node failed!");
+      }
+    
+    return clone;
   }
 
-  return clone;
-}
+  static MPDParser::MPDSegmentTimelineNode *
+  mpdparser_clone_segment_timeline (MPDParser::MPDSegmentTimelineNode *pointer)
+  {
+    MPDParser::MPDSegmentTimelineNode *clone = NULL;
+    
+    if (pointer) 
+      {
+	clone = new MPDParser::MPDSegmentTimelineNode();
+	if (clone) 
+	  {
+	    for (vector<MPDParser::MPD_SNode>::iterator it = pointer->mSNodes->begin();
+		 it != pointer->mSNodes->end();
+		 it++)
+	      {
+		MPDParser::MPD_SNode *s_node = new MPDParser::MPD_SNode(*it);
+		if (s_node != (MPDParser::MPD_SNode *)NULL)
+		  clone->mSNodes->push_back(*s_node);
+	      }
+	  }
+      } 
+    else
+      ALOGW ("Allocation of SegmentTimeline node failed!");
+
+    return clone;
+  }
+
+  static bool
+  mpdparser_get_xml_prop_uint64 (xmlNode *a_node, const char *property_name, 
+				 uint64_t default_val, uint64_t *property_value)
+  {
+    xmlChar *prop_string;
+    bool exists = false;
+    
+    *property_value = default_val;
+    prop_string = xmlGetProp (a_node, (const xmlChar *) property_name);
+    if (prop_string) 
+      {
+	if (sscanf ((char *) prop_string, "%llu", property_value)) 
+	  {
+	    exists = TRUE;
+	    ALOGV (" - %s: %llu", property_name, *property_value);
+	  } 
+	else 
+	  ALOGW("failed to parse unsigned integer property %s from xml string %s",
+		property_name, prop_string);
+	xmlFree (prop_string);
+      }
+    
+    return exists;
+  }
 
   static void
-  gst_mpdparser_parse_mult_seg_base_type_ext (GstMultSegmentBaseType **pointer,
-					      xmlNode *a_node, GstMultSegmentBaseType *parent)
+  mpdparser_parse_s_node (vector<MPDParser::MPD_SNode> **list, xmlNode *a_node)
+  {
+    uint64_t t, d;
+    uint32_t r;
+
+    ALOGV ("attributes of S node:");
+    mpdparser_get_xml_prop_uint64 (a_node, "t", 0, &t);
+    mpdparser_get_xml_prop_uint64 (a_node, "d", 0, &d);
+    mpdparser_get_xml_prop_uint (a_node, "r", 0, &r);
+
+    MPDParser::MPD_SNode *new_s_node = new MPDParser::MPD_SNode(t, d, r);
+    if (new_s_node != (MPDParser::MPD_SNode *)NULL) 
+      (*list)->push_back(*new_s_node);
+    else
+      ALOGW ("Allocation of S node failed!");
+  }
+
+  static void
+  mpdparser_parse_segment_timeline_node (MPDParser::MPDSegmentTimelineNode **pointer, xmlNode *a_node)
   {
     xmlNode *cur_node;
-    GstMultSegmentBaseType *mult_seg_base_type;
-    guint intval;
+    MPDParser::MPDSegmentTimelineNode *new_seg_timeline;
 
     delete *pointer;
-    *pointer = mult_seg_base_type = new MPDMultSegmentBaseType();
+    *pointer = new_seg_timeline = new MPDParser::MPDSegmentTimelineNode();
+    if (new_seg_timeline != NULL) 
+      {
+	/* explore children nodes */
+	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
+	  {
+	    if (cur_node->type == XML_ELEMENT_NODE) 
+	      {
+		if (xmlStrcmp (cur_node->name, (xmlChar *) "S") == 0) 
+		  mpdparser_parse_s_node (&new_seg_timeline->mSNodes, cur_node);
+	      }
+	  }
+      }
+    else
+      ALOGW ("Allocation of SegmentTimeline node failed!");
+  }
+
+  static void
+  mpdparser_parse_mult_seg_base_type_ext (MPDParser::MPDMultSegmentBaseType **pointer,
+					  xmlNode *a_node, MPDParser::MPDMultSegmentBaseType *parent)
+  {
+    xmlNode *cur_node;
+    MPDParser::MPDMultSegmentBaseType *mult_seg_base_type;
+    uint32_t intval;
+
+    delete *pointer;
+    *pointer = mult_seg_base_type = new MPDParser::MPDMultSegmentBaseType();
     if (mult_seg_base_type != NULL) 
       {
 	/* Inherit attribute values from parent */
@@ -794,26 +892,24 @@ gst_mpdparser_clone_segment_url (GstSegmentURLNode * seg_url)
 	  {
 	    mult_seg_base_type->mDuration = parent->mDuration;
 	    mult_seg_base_type->mStartNumber = parent->mStartNumber;
-	    mult_seg_base_type->mSegmentTimeline =
-	      mpdparser_clone_segment_timeline (parent->mSegmentTimeline);
-	    mult_seg_base_type->mBitstreamSwitching =
-	      mpdparser_clone_URL (parent->mBitstreamSwitching);
+	    mult_seg_base_type->mSegmentTimeline = mpdparser_clone_segment_timeline (parent->mSegmentTimeline);
+	    mult_seg_base_type->mBitstreamSwitching = mpdparser_clone_URL (parent->mBitstreamSwitching);
 	  }
 	
 	ALOGV ("attributes of MultipleSegmentBaseType extension:");
 
-	if (mpdparser_get_xml_prop_unsigned_integer (a_node, "duration", 0, &intval)) 
+	if (mpdparser_get_xml_prop_uint (a_node, "duration", 0, &intval)) 
 	  {
 	    mult_seg_base_type->mDuration = intval;
 	  }
-	if (mpdparser_get_xml_prop_unsigned_integer (a_node, "startNumber", 1, &intval)) 
+	if (mpdparser_get_xml_prop_uint (a_node, "startNumber", 1, &intval)) 
 	  {
 	    mult_seg_base_type->mStartNumber = intval;
 	  }
 	
 	ALOGV ("extension of MultipleSegmentBaseType extension:");
-	mpdparser_parse_seg_base_type_ext (&mult_seg_base_type->SegBaseType, a_node, 
-					   (parent ? parent->SegBaseType : NULL));
+	mpdparser_parse_seg_base_type_ext (&mult_seg_base_type->mSegmentBaseType, a_node, 
+					   (parent ? parent->mSegmentBaseType : NULL));
 	
 	/* explore children nodes */
 	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
@@ -822,17 +918,15 @@ gst_mpdparser_clone_segment_url (GstSegmentURLNode * seg_url)
 	      {
 		if (xmlStrcmp (cur_node->name, (xmlChar *)"SegmentTimeline") == 0) 
 		  {
-		    if (mult_seg_base_type->SegmentTimeline) 
-		      {
-			mpdparser_free_segment_timeline_node(mult_seg_base_type->mSegmentTimeline);
-		      }
+		    if (mult_seg_base_type->mSegmentTimeline) 
+		      delete mult_seg_base_type->mSegmentTimeline;
 		    mpdparser_parse_segment_timeline_node(&mult_seg_base_type->mSegmentTimeline, cur_node);
 		  }
 		else if (xmlStrcmp (cur_node->name, (xmlChar *)"BitstreamSwitching") == 0) 
 		  {
 		    if (mult_seg_base_type->mBitstreamSwitching) 
 		      {
-			mpdparser_free_url_type_node(mult_seg_base_type->mBitstreamSwitching);
+			delete mult_seg_base_type->mBitstreamSwitching;
 		      }
 		    mpdparser_parse_url_type_node(&mult_seg_base_type->mBitstreamSwitching, cur_node);
 		  }
@@ -846,28 +940,27 @@ gst_mpdparser_clone_segment_url (GstSegmentURLNode * seg_url)
   }
 
   static void
-  mpdparser_parse_segment_list_node (MPDSegmentListNode **pointer,
-				     xmlNode *a_node, MPDSegmentListNode *parent)
+  mpdparser_parse_segment_list_node (MPDParser::MPDSegmentListNode **pointer,
+				     xmlNode *a_node, MPDParser::MPDSegmentListNode *parent)
   {
     xmlNode *cur_node;
-    MPDSegmentListNode *new_segment_list;
+    MPDParser::MPDSegmentListNode *new_segment_list;
 
     delete *pointer;
-    *pointer = new_segment_list = new  MPDSegmentListNode();
-    if (new_segment_list != (MPDSegmentListNode *)NULL) 
+    *pointer = new_segment_list = new MPDParser::MPDSegmentListNode();
+    if (new_segment_list != (MPDParser::MPDSegmentListNode *)NULL) 
       {
 	/* Inherit attribute values from parent */
 	if (parent) 
 	  {
-	    vector<AString> *list = parent->mSegmentUrlNodes;
-	    MPDSegmentUrlNode *seg_url;
-	    for (vector<AString>::iterator it = list->begin();
+	    vector<MPDParser::MPDSegmentUrlNode> *list = parent->mSegmentUrlNodes;
+	    MPDParser::MPDSegmentUrlNode *seg_url;
+	    for (vector<MPDParser::MPDSegmentUrlNode>::iterator it = list->begin();
 		 it != list->end();
 		 it++)
 	      {
-		seg_url = (GstSegmentURLNode *)(*it);
-		new_segment_list->SegmentURL =
-		  new_segment_list->mSegmentUrlNodes->push_back(mpdparser_clone_segment_url (seg_url));
+		seg_url = (MPDParser::MPDSegmentUrlNode *)(*it);
+		new_segment_list->mSegmentUrlNodes->push_back(mpdparser_clone_segment_url (seg_url));
 	      }
 	  }
 	
@@ -954,9 +1047,7 @@ gst_mpdparser_clone_segment_url (GstSegmentURLNode * seg_url)
 	  }
       }
     else
-      {
-	ALOGW ("Allocation of Period node failed!");
-      }
+      ALOGW ("Allocation of Period node failed!");
   }
   
   static void
