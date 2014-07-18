@@ -341,6 +341,7 @@ namespace android
     /*
      * MPDSegmentListNode
      */
+    class MPDSegmentUrlNode;
     class MPDSegmentListNode : public RefBase {
     public:
       MPDSegmentListNode()
@@ -368,19 +369,19 @@ namespace android
     public:
       MPDSegmentTemplateNode()
 	: mMultSegBaseType(),
-	  mMedia(),
-	  mIndex(),
-	  mInitialization(),
-	  mBitstreamSwitching()
+	  mMedia(AString("")),
+	  mIndex(AString("")),
+	  mInitialization(AString("")),
+	  mBitstreamSwitching(AString(""))
       {};
 
       virtual ~MPDSegmentTemplateNode() {};
 
       MPDMultSegmentBaseType *mMultSegBaseType;
-      AString *mMedia;
-      AString *mIndex;
-      AString *mInitialization;
-      AString *mBitstreamSwitching;
+      AString mMedia;
+      AString mIndex;
+      AString mInitialization;
+      AString mBitstreamSwitching;
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentTemplateNode);
     };
@@ -391,17 +392,17 @@ namespace android
     class MPDSegmentUrlNode : public RefBase {
     public:
       MPDSegmentUrlNode()
-	: mMedia(),
+	: mMedia(AString("")),
 	  mMediaRange(),
-	  mIndex(),
+	  mIndex(AString("")),
 	  mIndexRange()
       {};
 
       virtual ~MPDSegmentUrlNode() {};
 
-      AString *mMedia;
+      AString mMedia;
       MPDRange *mMediaRange;
-      AString *mIndex;
+      AString mIndex;
       MPDRange *mIndexRange;
 
       DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentUrlNode);
@@ -681,10 +682,14 @@ namespace android
      */
     class MPDSubsetNode : public RefBase {
     public:
+      MPDSubsetNode()
+	: mContains(vector<uint32_t>()),
+	  mSize(0)
+      {};
+
       vector<uint32_t> mContains;                   /* UIntVectorType */
       uint32_t mSize;                               /* size of the "contains" array */
 
-    private:
       DISALLOW_EVIL_CONSTRUCTORS(MPDSubsetNode);
     };
 
@@ -703,7 +708,7 @@ namespace android
 	  mSegmentList(new MPDSegmentListNode()),
 	  mSegmentTemplate(new MPDSegmentTemplateNode()),
 	  mAdaptationSets(vector<MPDAdaptationSetNode>()),
-	  mSubsets(vector<MPDRepresentationNode>()),
+	  mSubsets(vector<MPDSubsetNode>()),
 	  mBaseURLs(vector<MPDBaseUrl>())
       {};
 
@@ -720,7 +725,7 @@ namespace android
       /* list of Adaptation Set nodes */
       vector<MPDAdaptationSetNode> mAdaptationSets;
       /* list of Representation nodes */
-      vector<MPDRepresentationNode> mSubsets;
+      vector<MPDSubsetNode> mSubsets;
       /* list of BaseURL nodes */
       vector<MPDBaseUrl> mBaseURLs;
 
