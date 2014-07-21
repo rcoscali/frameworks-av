@@ -62,16 +62,16 @@ namespace android {
       mSeqNumber(-1),
       mSeekTimeUs(-1),
       mNumRetries(0),
-    mStartOfPlayback(true),
-    mDurationUs(-1),
-    mDurationFixed(false),
-    mSeekDone(false),
-    mDisconnectPending(false),
-    mMonitorQueueGeneration(0),
-    mRefreshState(INITIAL_MINIMUM_RELOAD_DELAY) {
-    if (mUIDValid) {
+      mStartOfPlayback(true),
+      mDurationUs(-1),
+      mDurationFixed(false),
+      mSeekDone(false),
+      mDisconnectPending(false),
+      mMonitorQueueGeneration(0),
+      mRefreshState(INITIAL_MINIMUM_RELOAD_DELAY) 
+  {
+    if (mUIDValid)
       mHTTPDataSource->setUID(mUID);
-    }
   }
 
   DashSession::~DashSession() {
@@ -88,10 +88,8 @@ namespace android {
     msg->setString("url", url);
 
     if (headers != NULL) 
-      {
-	msg->setPointer("headers",
-			new KeyedVector<String8, String8>(*headers));
-      }
+      msg->setPointer("headers",
+		      new KeyedVector<String8, String8>(*headers));
 
     msg->post();
   }
@@ -184,8 +182,10 @@ namespace android {
       headers = NULL;
     }
 
-    //ALOGI("onConnect <URL suppressed>");
-    ALOGI("onConnect %s", url.c_str());
+    if ((mFlags & kFlagIncognito) != 0)
+      ALOGI("onConnect <URL suppressed>");
+    else
+      ALOGI("onConnect %s", url.c_str());
 
     mMasterURL = url;
 
@@ -199,7 +199,7 @@ namespace android {
       return;
     }
 
-    if (mpd->size() > 1) 
+    if (mpd->isVariantManifest()) 
       {
 	for (size_t i = 0; i < mpd->size(); ++i) 
 	  {
@@ -208,8 +208,8 @@ namespace android {
 	    sp<AMessage> meta;
 	    mpd->itemAt(i, &item.mURI, &meta);
 	    
-	unsigned long bandwidth;
-	CHECK(meta->findInt32("bandwidth", (int32_t *)&item.mBandwidth));
+	    unsigned long bandwidth;
+	    CHECK(meta->findInt32("bandwidth", (int32_t *)&item.mBandwidth));
 
 	mBandwidthItems.push(item);
       }

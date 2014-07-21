@@ -86,7 +86,7 @@ namespace android {
   static void        mpdparser_parse_segment_url_node  (vector<MPDParser::MPDSegmentUrlNode> **, xmlNode *);
   static void        mpdparser_parse_baseUrl_node      (vector<MPDParser::MPDBaseUrl> *, xmlNode *);
   static void        mpdparser_parse_adaptation_set_node (vector<MPDParser::MPDAdaptationSetNode> *, xmlNode *, MPDParser::MPDPeriodNode *);
-  static void        mpdparser_parse_representation_base_type (MPDParser::MPDRepresentationBaseType *, xmlNode *);
+  static void        mpdparser_parse_representation_base_type (MPDParser::MPDRepresentationBaseType &, xmlNode *);
   static void        mpdparser_parse_content_component_node (vector<MPDParser::MPDContentComponentNode> *, xmlNode *);
   static void        mpdparser_parse_descriptor_type_node (vector<MPDParser::MPDDescriptorType>*, xmlNode *);
   static void        mpdparser_parse_program_info_node (vector<MPDParser::MPDProgramInformationNode> *, xmlNode *);
@@ -139,6 +139,69 @@ namespace android {
     return mIsEvent;
   }
 
+  bool MPDParser::isVariantComputed()
+  {
+    return mIsVariantComputed;
+  }
+
+  bool MPDParser::isVariantManifest()
+  {
+    /* Manifest is variant if several bitrate are availables for the same content 
+     * i.e.: One adaptation set with several representation having misc bitrates
+     * If The AdaptationSet node has the attribute bitstreamSwitching to true, 
+     * manifest is variant.
+     */
+    if (initCheck()) 
+      {
+	if (isVariantComputed())
+	  return mIsVariant;
+      
+	for (vector<MPDStreamPeriod>::iterator it = mClient->mPeriods.begin(); 
+	     it != mClient->mPeriods.end();
+	     it++)
+	  {
+	    MPDPeriodNode cur_period = (*it).mPeriod;
+	    for (vector<MPDAdaptationSetNode>::iterator jt = cur_period.mAdaptationSets.begin();
+		 jt != cur_period.mAdaptationSets.end();
+		 jt++)
+	      {
+		MPDAdaptationSetNode cur_adaptation_set = (*jt);
+		/* Check bitstreamSwitching flag */
+		if (cur_adaptation_set.mBitstreamSwitching)
+		  {
+		    /* Set ? We're done */
+		    mIsVariantComputed = true;
+		    mIsVariant = true;
+		    return true;
+		  }
+		
+		if (cur_adaptation_set.mRepresentations.size() >= 2)
+		  {
+		    uint32_t prev_bandwidth = 0;
+		    for (vector<MPDRepresentationNode>::iterator kt = cur_adaptation_set.mRepresentations.begin();
+			 kt != cur_adaptation_set.mRepresentations.end();
+			 kt++)
+		      {
+			MPDRepresentationNode cur_repres = (*kt);
+			if (prev_bandwidth != 0 && prev_bandwidth != cur_repres.mBandwidth)
+			  {
+			    mIsVariantComputed = true;
+			    mIsVariant = true;
+			    return true;
+			  }
+			
+			prev_bandwidth = cur_repres.mBandwidth;
+		      }
+		  }
+	      }
+	  }
+	mIsVariantComputed = true;
+	mIsVariant = false;
+	return false;
+      }
+    return false;
+  }
+
   sp<AMessage> MPDParser::meta() 
   {
     return mMeta;
@@ -160,8 +223,8 @@ namespace android {
   }
 
   /*
-   * Implem of parser helper funcs 
-   *===============================
+   * Definition of parser helper funcs 
+   * =================================
    */
 
   static bool 
@@ -1540,7 +1603,7 @@ namespace android {
   mpdparser_get_xml_prop_string_vector_type (xmlNode *a_node, const char *property_name, uint32_t *property_size)
   {
     xmlChar *prop_string;
-    vector<AString> property_value(vector<AString>());
+    vector<AString> property_value;
 
     prop_string = xmlGetProp (a_node, (const xmlChar *)property_name);
     if (prop_string) 
@@ -1571,6 +1634,29 @@ namespace android {
   }
 
   static void
+  mpdparser_parse_subrepresentation_node (vector<MPDParser::MPDSubRepresentationNode> *list, xmlNode *a_node)
+  {
+    MPDParser::MPDSubRepresentationNode *new_subrep;
+    
+    new_subrep = new MPDParser::MPDSubRepresentationNode();
+    if (new_subrep != (MPDParser::MPDSubRepresentationNode *)NULL) 
+      {
+	list->push_back(*new_subrep);
+	
+	ALOGV ("attributes of SubRepresentation node:");
+	mpdparser_get_xml_prop_uint (a_node, "level", 0, &new_subrep->mLevel);
+	new_subrep->mDependencyLevel = mpdparser_get_xml_prop_uint_vector_type (a_node, "dependencyLevel", &new_subrep->mSize);
+	mpdparser_get_xml_prop_uint (a_node, "bandwidth", 0, &new_subrep->mBandwidth);
+	new_subrep->mContentComponent = mpdparser_get_xml_prop_string_vector_type (a_node, "contentComponent", (uint32_t *)NULL);
+
+	/* RepresentationBase extension */
+	mpdparser_parse_representation_base_type (*(new_subrep->mRepresentationBase), a_node);
+      }
+    else
+      ALOGW ("Allocation of SubRepresentation node failed!");
+  }
+
+  static void
   mpdparser_parse_representation_node (vector<MPDParser::MPDRepresentationNode> *list, xmlNode *a_node, MPDParser::MPDAdaptationSetNode *parent)
   {
     xmlNode *cur_node;
@@ -1589,7 +1675,7 @@ namespace android {
 	new_representation->mMediaStreamStructureId = mpdparser_get_xml_prop_string_vector_type (a_node, "mediaStreamStructureId", (uint32_t *)NULL);
 
 	/* RepresentationBase extension */
-	mpdparser_parse_representation_base_type (&new_representation->mRepresentationBase, a_node);
+	mpdparser_parse_representation_base_type (*(new_representation->mRepresentationBase), a_node);
 
 	/* explore children nodes */
 	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
@@ -1606,7 +1692,7 @@ namespace android {
 		  mpdparser_parse_segment_list_node (&new_representation->mSegmentList, cur_node, parent->mSegmentList);
 
 		else if (xmlStrcmp (cur_node->name, (xmlChar *) "BaseURL") == 0)
-		  mpdparser_parse_baseURL_node (&new_representation->BaseURLs, cur_node);
+		  mpdparser_parse_baseUrl_node (&new_representation->mBaseUrls, cur_node);
 
 		else if (xmlStrcmp (cur_node->name, (xmlChar *) "SubRepresentation") == 0)
 		  mpdparser_parse_subrepresentation_node (&new_representation->mSubRepresentations, cur_node);
@@ -1857,7 +1943,7 @@ namespace android {
   }
 
   static void
-  mpdparser_parse_metrics_range_node (vector<MPDParser::MPDMetricsNode> *list, xmlNode *a_node)
+  mpdparser_parse_metrics_range_node (vector<MPDParser::MPDMetricsRangeNode> *list, xmlNode *a_node)
   {
     MPDParser::MPDMetricsRangeNode *new_metrics_range;
 
@@ -2038,3 +2124,6 @@ namespace android {
 
 } /* namespace android */
 
+// Local Variables:
+// mode:C++
+// End:

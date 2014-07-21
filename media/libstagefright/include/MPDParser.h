@@ -23,6 +23,9 @@ using namespace std;
 
 namespace android
 {
+#define ALLOW_EVIL_CONSTRUCTORS(name) \
+  name(const name &) : RefBase() {};  \
+  name &operator=(const name &) {return *this;}
   
   class MPDParser : public RefBase
   {
@@ -33,16 +36,15 @@ namespace android
     
     bool isComplete() const;
     bool isEvent() const;
+    bool isVariantManifest();
+    bool isVariantComputed();
 
     sp<AMessage> meta();
 
     size_t size();
     bool itemAt(size_t index, AString *uri, sp<AMessage> *meta = NULL);
 
-  protected:
     virtual ~MPDParser();
-
-  public:
 
     /*
      * Stream type
@@ -107,7 +109,7 @@ namespace android
       AString mServiceLocation;
       AString mByteRange;
       
-      DISALLOW_EVIL_CONSTRUCTORS(MPDBaseUrl);
+      ALLOW_EVIL_CONSTRUCTORS(MPDBaseUrl);
     };
 
     /*
@@ -132,7 +134,7 @@ namespace android
       uint64_t mLastBytePos;
 
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDRange);
+      ALLOW_EVIL_CONSTRUCTORS(MPDRange);
     };
 
     /*
@@ -157,7 +159,7 @@ namespace android
       uint32_t mNum;
       uint32_t mDen;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDRatio);
+      ALLOW_EVIL_CONSTRUCTORS(MPDRatio);
     };
 
     /*
@@ -169,13 +171,17 @@ namespace android
 	: MPDRatio() 
       {};
 
+      MPDFrameRate(const MPDFrameRate &copy)
+	: MPDRatio(copy.mNum, copy.mDen) 
+      {};
+
       MPDFrameRate(uint32_t num, uint32_t den)
 	: MPDRatio(num, den) 
       {};
 
       virtual ~MPDFrameRate() {};
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDFrameRate);
+      MPDFrameRate & operator=(const MPDFrameRate &rhs) {mNum = rhs.mNum; mDen = rhs.mDen; return *this;};
     };
 
     /*
@@ -197,7 +203,7 @@ namespace android
       bool mFlag;
       uint32_t mValue;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDConditionalUintType);
+      ALLOW_EVIL_CONSTRUCTORS(MPDConditionalUintType);
     };
 
     /*
@@ -230,7 +236,7 @@ namespace android
 	return *this;
       };
 
-      //      DISALLOW_EVIL_CONSTRUCTORS(MPD_SNode);
+      //      ALLOW_EVIL_CONSTRUCTORS(MPD_SNode);
     };
 
     /*
@@ -250,7 +256,7 @@ namespace android
 
       vector<MPD_SNode> *mSNodes;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentTimelineNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentTimelineNode);
     };
 
     /*
@@ -276,7 +282,7 @@ namespace android
       MPDRange *mRange;
 
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDUrlType);
+      ALLOW_EVIL_CONSTRUCTORS(MPDUrlType);
     };
 
     /*
@@ -304,7 +310,7 @@ namespace android
       MPDUrlType *mRepresentationIndex;
 
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentBaseType);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentBaseType);
     };
 
     /*
@@ -328,7 +334,7 @@ namespace android
       MPDSegmentTimelineNode *mSegmentTimeline;
       MPDUrlType *mBitstreamSwitching;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMultSegmentBaseType);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMultSegmentBaseType);
     };
 
     /*
@@ -352,7 +358,7 @@ namespace android
       MPDMultSegmentBaseType *mMultSegBaseType;
       vector<MPDSegmentUrlNode> *mSegmentUrlNodes;
       
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentListNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentListNode);
     };
 
     /*
@@ -376,7 +382,7 @@ namespace android
       AString mInitialization;
       AString mBitstreamSwitching;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentTemplateNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentTemplateNode);
     };
 
     /*
@@ -398,7 +404,7 @@ namespace android
       AString mIndex;
       MPDRange *mIndexRange;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSegmentUrlNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentUrlNode);
     };
 
     /*
@@ -457,7 +463,7 @@ namespace android
       vector<MPDDescriptorType> mAudioChannelConfiguration;
       vector<MPDDescriptorType> mContentProtection;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDRepresentationBaseType);
+      ALLOW_EVIL_CONSTRUCTORS(MPDRepresentationBaseType);
     };
 
     /*
@@ -485,7 +491,7 @@ namespace android
       uint32_t mBandwidth;
       vector<AString> mContentComponent;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSubRepresentationNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSubRepresentationNode);
     };
 
     /*
@@ -500,8 +506,8 @@ namespace android
 	  mDependencyId(vector<AString>()),
 	  mMediaStreamStructureId(vector<AString>()),
 	  mRepresentationBase(new MPDRepresentationBaseType()),
-	  mBaseUrls(vector<AString>()),
-	  mSubRepresentations(vector<AString>()),
+	  mBaseUrls(vector<MPDBaseUrl>()),
+	  mSubRepresentations(vector<MPDSubRepresentationNode>()),
 	  mSegmentBase(new MPDSegmentBaseType()),
 	  mSegmentTemplate(new MPDSegmentTemplateNode()),
 	  mSegmentList(new MPDSegmentListNode())
@@ -523,9 +529,9 @@ namespace android
       /* RepresentationBase extension */
       MPDRepresentationBaseType *mRepresentationBase;
       /* list of BaseUrl nodes */
-      vector<AString> mBaseUrls;
+      vector<MPDBaseUrl> mBaseUrls;
       /* list of SubRepresentation nodes */
-      vector<AString> mSubRepresentations;
+      vector<MPDSubRepresentationNode> mSubRepresentations;
       /* SegmentBase node */
       MPDSegmentBaseType *mSegmentBase;
       /* SegmentTemplate node */
@@ -533,7 +539,7 @@ namespace android
       /* SegmentList node */
       MPDSegmentListNode *mSegmentList;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDRepresentationNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDRepresentationNode);
     };
 
     /*
@@ -552,7 +558,7 @@ namespace android
       AString mSchemeIdUri;
       AString mValue;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDDescriptorType);
+      ALLOW_EVIL_CONSTRUCTORS(MPDDescriptorType);
     };
 
     /*
@@ -589,7 +595,7 @@ namespace android
       /* list of Viewpoint DescriptorType nodes */
       vector<MPDDescriptorType> mViewpoint;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDContentComponentNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDContentComponentNode);
     };
 
     /*
@@ -680,7 +686,7 @@ namespace android
       /* list of ContentComponent nodes */
       vector<MPDContentComponentNode> mContentComponents;
       
-      DISALLOW_EVIL_CONSTRUCTORS(MPDAdaptationSetNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDAdaptationSetNode);
     };
 
     /*
@@ -696,7 +702,7 @@ namespace android
       vector<uint32_t> mContains;                   /* UIntVectorType */
       uint32_t mSize;                               /* size of the "contains" array */
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDSubsetNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDSubsetNode);
     };
 
     /*
@@ -735,7 +741,7 @@ namespace android
       /* list of BaseUrl nodes */
       vector<MPDBaseUrl> mBaseUrls;
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDPeriodNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDPeriodNode);
     };
 
     /*
@@ -743,6 +749,14 @@ namespace android
      */
     class MPDProgramInformationNode : public RefBase {
     public:
+      MPDProgramInformationNode()
+	: mLang(AString("")),
+	  mMoreInformationURL(AString("")),
+	  mTitle(AString("")),
+	  mSource(AString("")),
+	  mCopyright(AString(""))
+      {};
+
       AString mLang;                      /* LangVectorType RFC 5646 */
       AString mMoreInformationURL;
       /* children nodes */
@@ -750,7 +764,7 @@ namespace android
       AString mSource;
       AString mCopyright;
       
-      DISALLOW_EVIL_CONSTRUCTORS(MPDProgramInformationNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDProgramInformationNode);
     };
 
     /*
@@ -758,10 +772,15 @@ namespace android
      */
     class MPDMetricsRangeNode : public RefBase {
     public:
+      MPDMetricsRangeNode()
+	: mStarttime(0L),
+	  mDuration(0L)
+      {};
+
       int64_t mStarttime;                  /* [ms] */
       int64_t mDuration;                   /* [ms] */
       
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMetricsRangeNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMetricsRangeNode);
     };
 
     /*
@@ -769,13 +788,19 @@ namespace android
      */
     class MPDMetricsNode : public RefBase {
     public:
+      MPDMetricsNode()
+	: mMetrics(AString("")),
+	  mMetricsRanges(vector<MPDMetricsRangeNode>()),
+	  mReportings(vector<MPDDescriptorType>())
+      {};
+
       AString mMetrics;
       /* list of Metrics Range nodes */
       vector<MPDMetricsRangeNode> mMetricsRanges;
       /* list of Reporting nodes */
       vector<MPDDescriptorType> mReportings;
       
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMetricsNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMetricsNode);
     };
 
     /*
@@ -819,7 +844,7 @@ namespace android
       uint8_t mSecond;
 
     public:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDDateTime);
+      ALLOW_EVIL_CONSTRUCTORS(MPDDateTime);
     };
 
     /*
@@ -905,7 +930,7 @@ namespace android
 	mMetrics.clear(); 
       };
 
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMpdNode);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMpdNode);
     };
 
     /*
@@ -918,8 +943,7 @@ namespace android
       MPDClockTime mStart;
       MPDClockTime mDuration;
       
-    private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDStreamPeriod);
+      ALLOW_EVIL_CONSTRUCTORS(MPDStreamPeriod);
     };
 
     /*
@@ -934,7 +958,7 @@ namespace android
       MPDClockTime mDuration;                      /* segment duration */
 
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMediaSegment);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMediaSegment);
     };
 
     /*
@@ -955,7 +979,7 @@ namespace android
       MPDClockTime mDuration;      
 
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMediaFragmentInfo);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMediaFragmentInfo);
     };
 
     /*
@@ -980,7 +1004,7 @@ namespace android
       vector<MPDMediaSegment> mSegments;          /* array of MPDMediaSegment */
       
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDActiveStream);
+      ALLOW_EVIL_CONSTRUCTORS(MPDActiveStream);
     };
 
     /*
@@ -1000,20 +1024,12 @@ namespace android
       Mutex mLock;
       
     private:
-      DISALLOW_EVIL_CONSTRUCTORS(MPDMpdClient);
+      ALLOW_EVIL_CONSTRUCTORS(MPDMpdClient);
     };
 
-
-
-
-
-
-
-
-
-
-
-
+    /*
+     * This class is used for managing chunks bandwidth
+     */
     class Item : public RefBase {
     public:
       Item()
@@ -1024,28 +1040,31 @@ namespace android
       AString mUri;
       sp<AMessage> mMeta;
 
-      DISALLOW_EVIL_CONSTRUCTORS(Item);
+      ALLOW_EVIL_CONSTRUCTORS(Item);
     };
 
 
-
-
-
+    /* =================
+     * Parser properties
+     */
 
     MPDMpdClient *mClient;
 
+  private:
     status_t mInitCheck;
 
     AString mBaseURI;
     bool mIsComplete;
     bool mIsEvent;
+    bool mIsVariant;
+    bool mIsVariantComputed;
     
     sp<AMessage> mMeta;
     Vector<Item> mItems;
 
     status_t parse(const void *data, size_t size);
 
-    DISALLOW_EVIL_CONSTRUCTORS(MPDParser);
+    ALLOW_EVIL_CONSTRUCTORS(MPDParser);
   };
 
 };

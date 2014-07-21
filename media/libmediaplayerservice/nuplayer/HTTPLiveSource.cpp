@@ -31,9 +31,10 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 
-namespace android {
+namespace android 
+{
 
-NuPlayer::HTTPLiveSource::HTTPLiveSource(
+  NuPlayer::HTTPLiveSource::HTTPLiveSource(
         const sp<AMessage> &notify,
         const char *url,
         const KeyedVector<String8, String8> *headers,
@@ -44,33 +45,39 @@ NuPlayer::HTTPLiveSource::HTTPLiveSource(
       mUID(uid),
       mFlags(0),
       mFinalResult(OK),
-      mOffset(0) {
-    if (headers) {
+      mOffset(0) 
+  {
+    if (headers) 
+      {
         mExtraHeaders = *headers;
 
         ssize_t index =
-            mExtraHeaders.indexOfKey(String8("x-hide-urls-from-log"));
+	  mExtraHeaders.indexOfKey(String8("x-hide-urls-from-log"));
 
-        if (index >= 0) {
+        if (index >= 0) 
+	  {
             mFlags |= kFlagIncognito;
-
+	    
             mExtraHeaders.removeItemsAt(index);
-        }
-    }
-}
+	  }
+      }
+  };
 
-NuPlayer::HTTPLiveSource::~HTTPLiveSource() {
-    if (mLiveSession != NULL) {
+  NuPlayer::HTTPLiveSource::~HTTPLiveSource() 
+  {
+    if (mLiveSession != NULL) 
+      {
         mLiveSession->disconnect();
         mLiveLooper->stop();
-    }
-}
+      }
+  };
 
-void NuPlayer::HTTPLiveSource::prepareAsync() {
+  void NuPlayer::HTTPLiveSource::prepareAsync() 
+  {
     mLiveLooper = new ALooper;
     mLiveLooper->setName("http live");
     mLiveLooper->start();
-
+    
     sp<AMessage> notify = new AMessage(kWhatSessionNotify, id());
 
     mLiveSession = new LiveSession(
@@ -84,175 +91,191 @@ void NuPlayer::HTTPLiveSource::prepareAsync() {
             mURL.c_str(), mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
 
     mTSParser = new ATSParser;
-}
+  };
 
-void NuPlayer::HTTPLiveSource::start() {
-}
+  void NuPlayer::HTTPLiveSource::start() 
+  {
+  };
 
-sp<MetaData> NuPlayer::HTTPLiveSource::getFormatMeta(bool audio) {
+  sp<MetaData> NuPlayer::HTTPLiveSource::getFormatMeta(bool audio) 
+  {
     ATSParser::SourceType type =
-        audio ? ATSParser::AUDIO : ATSParser::VIDEO;
+      audio ? ATSParser::AUDIO : ATSParser::VIDEO;
 
     sp<AnotherPacketSource> source =
-        static_cast<AnotherPacketSource *>(mTSParser->getSource(type).get());
+      static_cast<AnotherPacketSource *>(mTSParser->getSource(type).get());
 
-    if (source == NULL) {
-        return NULL;
-    }
+    if (source == NULL)
+      return NULL;
 
     return source->getFormat();
-}
+  }
 
-status_t NuPlayer::HTTPLiveSource::feedMoreTSData() {
-    if (mFinalResult != OK) {
-        return mFinalResult;
-    }
+  status_t NuPlayer::HTTPLiveSource::feedMoreTSData() 
+  {
+    if (mFinalResult != OK)
+      return mFinalResult;
 
     sp<LiveDataSource> source =
         static_cast<LiveDataSource *>(mLiveSession->getDataSource().get());
 
-    for (int32_t i = 0; i < 50; ++i) {
-        char buffer[188];
+    for (int32_t i = 0; i < 50; ++i) 
+      {
+        char buffer[android::kTSPacketSize];
         ssize_t n = source->readAtNonBlocking(mOffset, buffer, sizeof(buffer));
 
-        if (n == -EWOULDBLOCK) {
+        if (n == -EWOULDBLOCK) 
+	  {
             break;
-        } else if (n < 0) {
-            if (n != ERROR_END_OF_STREAM) {
-                ALOGI("input data EOS reached, error %ld", n);
-            } else {
-                ALOGI("input data EOS reached.");
-            }
+	  } 
+	else if (n < 0) 
+	  {
+            if (n != ERROR_END_OF_STREAM) 
+	      ALOGI("input data EOS reached, error %d", n);
+            else
+	      ALOGI("input data EOS reached.");
+            
             mTSParser->signalEOS(n);
             mFinalResult = n;
             break;
-        } else {
-            if (buffer[0] == 0x00) {
+	  } 
+	else
+	  {
+            if (buffer[0] == 0x00) 
+	      {
                 // XXX legacy
 
                 uint8_t type = buffer[1];
 
                 sp<AMessage> extra = new AMessage;
 
-                if (type & 2) {
+                if (type & 2) 
+		  {
                     int64_t mediaTimeUs;
                     memcpy(&mediaTimeUs, &buffer[2], sizeof(mediaTimeUs));
 
                     extra->setInt64(IStreamListener::kKeyMediaTimeUs, mediaTimeUs);
-                }
+		  }
 
                 mTSParser->signalDiscontinuity(
                         ((type & 1) == 0)
                             ? ATSParser::DISCONTINUITY_SEEK
                             : ATSParser::DISCONTINUITY_FORMATCHANGE,
                         extra);
-            } else {
+	      } 
+	    else 
+	      {
                 status_t err = mTSParser->feedTSPacket(buffer, sizeof(buffer));
 
-                if (err != OK) {
+                if (err != OK) 
+		  {
                     ALOGE("TS Parser returned error %d", err);
                     mTSParser->signalEOS(err);
                     mFinalResult = err;
                     break;
-                }
-            }
+		  }
+	      }
 
             mOffset += n;
-        }
-    }
+	  }
+      }
 
     return OK;
-}
+  };
 
-status_t NuPlayer::HTTPLiveSource::dequeueAccessUnit(
-        bool audio, sp<ABuffer> *accessUnit) {
+  status_t NuPlayer::HTTPLiveSource::dequeueAccessUnit(
+        bool audio, sp<ABuffer> *accessUnit) 
+  {
     ATSParser::SourceType type =
         audio ? ATSParser::AUDIO : ATSParser::VIDEO;
 
     sp<AnotherPacketSource> source =
-        static_cast<AnotherPacketSource *>(mTSParser->getSource(type).get());
+      static_cast<AnotherPacketSource *>(mTSParser->getSource(type).get());
 
-    if (source == NULL) {
-        return -EWOULDBLOCK;
-    }
+    if (source == NULL)
+      return -EWOULDBLOCK;
 
     status_t finalResult;
-    if (!source->hasBufferAvailable(&finalResult)) {
-        return finalResult == OK ? -EWOULDBLOCK : finalResult;
-    }
+    if (!source->hasBufferAvailable(&finalResult))
+      return finalResult == OK ? -EWOULDBLOCK : finalResult;
 
     return source->dequeueAccessUnit(accessUnit);
-}
+  };
 
-status_t NuPlayer::HTTPLiveSource::getDuration(int64_t *durationUs) {
+  status_t NuPlayer::HTTPLiveSource::getDuration(int64_t *durationUs) 
+  {
     return mLiveSession->getDuration(durationUs);
-}
+  };
 
-status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs) {
+  status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs) 
+  {
     // We need to make sure we're not seeking until we have seen the very first
     // PTS timestamp in the whole stream (from the beginning of the stream).
-    while (!mTSParser->PTSTimeDeltaEstablished() && feedMoreTSData() == OK) {
+    while (!mTSParser->PTSTimeDeltaEstablished() && feedMoreTSData() == OK)
         usleep(100000);
-    }
 
     mLiveSession->seekTo(seekTimeUs);
 
     return OK;
-}
+  };
 
-void NuPlayer::HTTPLiveSource::onMessageReceived(const sp<AMessage> &msg) {
-    switch (msg->what()) {
-        case kWhatSessionNotify:
+  void NuPlayer::HTTPLiveSource::onMessageReceived(const sp<AMessage> &msg) 
+  {
+    switch (msg->what()) 
+      {
+      case kWhatSessionNotify:
         {
-            onSessionNotify(msg);
-            break;
+	  onSessionNotify(msg);
+	  break;
         }
 
-        default:
-            Source::onMessageReceived(msg);
-            break;
-    }
-}
+      default:
+	Source::onMessageReceived(msg);
+	break;
+      }
+  };
 
-void NuPlayer::HTTPLiveSource::onSessionNotify(const sp<AMessage> &msg) {
+  void NuPlayer::HTTPLiveSource::onSessionNotify(const sp<AMessage> &msg) 
+  {
     int32_t what;
     CHECK(msg->findInt32("what", &what));
 
-    switch (what) {
-        case LiveSession::kWhatPrepared:
+    switch (what) 
+      {
+      case LiveSession::kWhatPrepared:
         {
-            notifyVideoSizeChanged(0, 0);
+	  notifyVideoSizeChanged(0, 0);
 
-            uint32_t flags = FLAG_CAN_PAUSE;
-            if (mLiveSession->isSeekable()) {
-                flags |= FLAG_CAN_SEEK;
-                flags |= FLAG_CAN_SEEK_BACKWARD;
-                flags |= FLAG_CAN_SEEK_FORWARD;
-            }
+	  uint32_t flags = FLAG_CAN_PAUSE;
+	  if (mLiveSession->isSeekable()) 
+	    {
+	      flags |= FLAG_CAN_SEEK;
+	      flags |= FLAG_CAN_SEEK_BACKWARD;
+	      flags |= FLAG_CAN_SEEK_FORWARD;
+	    }
 
-            if (mLiveSession->hasDynamicDuration()) {
-                flags |= FLAG_DYNAMIC_DURATION;
-            }
+	  if (mLiveSession->hasDynamicDuration()) 
+	    flags |= FLAG_DYNAMIC_DURATION;
 
-            notifyFlagsChanged(flags);
-
-            notifyPrepared();
-            break;
+	  notifyFlagsChanged(flags);
+	  
+	  notifyPrepared();
+	  break;
         }
 
-        case LiveSession::kWhatPreparationFailed:
+      case LiveSession::kWhatPreparationFailed:
         {
-            status_t err;
-            CHECK(msg->findInt32("err", &err));
-
-            notifyPrepared(err);
-            break;
+	  status_t err;
+	  CHECK(msg->findInt32("err", &err));
+	  
+	  notifyPrepared(err);
+	  break;
         }
 
-        default:
-            TRESPASS();
-    }
-}
+      default:
+	TRESPASS();
+      }
+  };
 
-}  // namespace android
+};  // namespace android
 

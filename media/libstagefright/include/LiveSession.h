@@ -35,9 +35,9 @@ struct LiveSession : public AHandler {
         // Don't log any URLs.
         kFlagIncognito = 1,
     };
-    LiveSession(
-            const sp<AMessage> &notify,
-            uint32_t flags = 0, bool uidValid = false, uid_t uid = 0);
+
+    LiveSession(const sp<AMessage> &notify,
+		uint32_t flags = 0, bool uidValid = false, uid_t uid = 0);
 
     sp<DataSource> getDataSource();
 

@@ -73,7 +73,8 @@ public:
 private:
     struct Decoder;
     struct GenericSource;
-    struct HTTPLiveSource;
+    /*struct HTTPLiveSource;*/
+    struct DashMpdSource;
     struct Renderer;
     struct RTSPSource;
     struct StreamingSource;
