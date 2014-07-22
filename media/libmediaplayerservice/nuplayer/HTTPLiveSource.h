@@ -28,11 +28,11 @@ struct LiveSession;
 
 struct NuPlayer::HTTPLiveSource : public NuPlayer::Source {
     HTTPLiveSource(
-            const sp<AMessage> &notify,
-            const char *url,
+            const sp<AMessage>                  &notify,
+            const char                          *url,
             const KeyedVector<String8, String8> *headers,
-            bool uidValid = false,
-            uid_t uid = 0);
+            bool                                 uidValid = false,
+            uid_t                                uid = 0);
 
     virtual void prepareAsync();
     virtual void start();

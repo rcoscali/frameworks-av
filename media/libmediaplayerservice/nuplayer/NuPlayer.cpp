@@ -20,7 +20,9 @@
 
 #include "NuPlayer.h"
 
+
 #include "HTTPLiveSource.h"
+#include "DashMpdSource.h"
 #include "NuPlayerDecoder.h"
 #include "NuPlayerDriver.h"
 #include "NuPlayerRenderer.h"

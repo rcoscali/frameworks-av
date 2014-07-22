@@ -30,6 +30,7 @@ namespace android {
   struct HTTPBase;
 
   class DashSession : public AHandler {
+  public:
     enum Flags {
       // Don't log any URLs.
       kFlagIncognito = 1,
@@ -40,8 +41,7 @@ namespace android {
 
     sp<DataSource> getDataSource();
 
-    void connect(
-		 const char *url,
+    void connect(const char *url,
 		 const KeyedVector<String8, String8> *headers = NULL);
 
     void disconnect();

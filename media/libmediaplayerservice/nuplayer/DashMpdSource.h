@@ -15,6 +15,7 @@
  */
 
 #ifndef DASH_MPD_SOURCE_H_
+
 #define DASH_MPD_SOURCE_H_
 
 #include "NuPlayer.h"
@@ -22,14 +23,14 @@
 
 namespace android {
 
-struct ATSParser;
-struct MPEG4Extractor;
-struct LiveSession;
+ public:
+  struct FragmentedMP4Parser;
+  struct DashSession;
 
-struct NuPlayer::DashMpdSource : public NuPlayer::Source {
+  struct NuPlayer::DashMpdSource : public NuPlayer::Source {
     DashMpdSource(
-            const sp<AMessage>&                  notify,
-            const char*                          url,
+            const sp<AMessage>                  &notify,
+            const char                          *url,
             const KeyedVector<String8, String8> *headers,
                   bool                           uidValid = false,
                   uid_t                          uid = 0);
@@ -37,8 +38,7 @@ struct NuPlayer::DashMpdSource : public NuPlayer::Source {
     virtual void prepareAsync();
     virtual void start();
 
-    //    virtual status_t feedMoreTSData();
-    virtual status_t feedMoreISOBMFFData();
+    virtual status_t feedMoreMP4Data();
 
     virtual status_t dequeueAccessUnit(bool audio, sp<ABuffer> *accessUnit);
 
@@ -69,10 +69,9 @@ private:
     uint32_t mFlags;
     status_t mFinalResult;
     off64_t mOffset;
-    sp<ALooper> mLiveLooper;
-    sp<LiveSession> mLiveSession;
-    sp<ATSParser> mTSParser;
-    sp<MPEG4Extractor> mMPEG4Extractor;
+    sp<ALooper> mDashLooper;
+    sp<DashSession> mDashSession;
+    sp<FragmentedMP4Parser> mMP4Parser;
 
     void onSessionNotify(const sp<AMessage> &msg);
 

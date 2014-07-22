@@ -144,7 +144,7 @@ void NuPlayer::GenericSource::start() {
         mVideoTrack.mPackets =
             new AnotherPacketSource(mVideoTrack.mSource->getFormat());
 
-        readBuffer(false /* audio */);
+        readBuffer(false /* video */);
     }
 }
 
