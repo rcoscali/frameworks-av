@@ -111,12 +111,14 @@ namespace android {
    * Parser class core implem
    */
   MPDParser::MPDParser(const char *baseURI, const void *data, size_t size)
-    : mInitCheck(NO_INIT),
+    : RefBase(),
+      mInitCheck(NO_INIT),
       mBaseURI(baseURI),
       mIsComplete(false),
       mIsEvent(false)
   {
     /* Try to parse MPD and if success store as init/check state variable */
+    mClient = new MPDMpdClient(baseURI);
     mInitCheck = parse(data, size);
   }
 
@@ -297,6 +299,7 @@ namespace android {
   {
     xmlNs *curr_ns;
     char *namspc = (char *)NULL;
+    AString ret;
 
     if (prefix == (char *)NULL) 
       {
@@ -319,7 +322,8 @@ namespace android {
 	  }
       }
     
-    return *(new AString(namspc));
+    ASSIGN_ASTRING_WITH_POSSIBLE_NULL(ret, namspc);
+    return ret;
   }
 
   /*
@@ -2071,6 +2075,10 @@ namespace android {
       {
 	delete mClient->mMpdNode;
 	mClient->mMpdNode = (MPDMpdNode *)NULL;
+      }
+    if (mClient != (MPDMpdClient *)NULL && mClient->mMpdNode == (MPDMpdNode *)NULL)
+      {
+	mClient->mMpdNode = new MPDMpdNode();
       }
 
     const char *data = (const char *)_data;

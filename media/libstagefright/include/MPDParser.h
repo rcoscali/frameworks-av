@@ -1602,6 +1602,15 @@ namespace android
      */
     class MPDMpdClient : public RefBase {
     public:
+      MPDMpdClient(const char *baseUri)
+	: RefBase(),
+	  mMpdNode((MPDMpdNode *)NULL),
+	  mPeriods(vector<MPDStreamPeriod>()),
+	  mActiveStreams(vector<MPDActiveStream>()),
+	  mUpdateFailedCount(0),
+	  mMpdUri(AString(baseUri))
+      {};
+	  
       MPDMpdNode *mMpdNode;                       /* active MPD manifest file */
 
       vector<MPDStreamPeriod> mPeriods;           /* list of MPDStreamPeriod */
