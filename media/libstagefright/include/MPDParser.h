@@ -23,10 +23,6 @@ using namespace std;
 
 namespace android
 {
-#define ALLOW_EVIL_CONSTRUCTORS(name) \
-  name(const name &) : RefBase() {};  \
-  name &operator=(const name &) {return *this;}
-  
   class MPDParser : public RefBase
   {
   public:
@@ -109,7 +105,22 @@ namespace android
       AString mServiceLocation;
       AString mByteRange;
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDBaseUrl);
+      MPDBaseUrl(const MPDBaseUrl &copyin) 
+	: RefBase(),
+	  mBaseUrl(copyin.mBaseUrl),
+	  mServiceLocation(copyin.mServiceLocation),
+	  mByteRange(copyin.mByteRange)
+      {};
+
+      MPDBaseUrl &operator=(const MPDBaseUrl &rhs) 
+      {
+	mBaseUrl = rhs.mBaseUrl;
+	mServiceLocation = rhs.mServiceLocation;
+	mByteRange = rhs.mByteRange;
+	
+	return *this;
+      };
+      
     };
 
     /*
@@ -133,8 +144,19 @@ namespace android
       uint64_t mFirstBytePos;
       uint64_t mLastBytePos;
 
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDRange);
+      MPDRange(const MPDRange &copyin) 
+	: RefBase(),
+	  mFirstBytePos(copyin.mFirstBytePos),
+	  mLastBytePos(copyin.mLastBytePos)
+      {};
+      MPDRange &operator=(const MPDRange &rhs)
+      {
+	mFirstBytePos = rhs.mFirstBytePos;
+	mLastBytePos = rhs.mLastBytePos;
+
+	return *this;
+      };
+
     };
 
     /*
@@ -159,7 +181,20 @@ namespace android
       uint32_t mNum;
       uint32_t mDen;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDRatio);
+      MPDRatio(const MPDRatio &copyin)
+	: RefBase()
+      {
+	mNum = copyin.mNum;
+	mDen = copyin.mDen;
+      };
+      MPDRatio &operator=(const MPDRatio &rhs)
+      {
+	mNum = rhs.mNum;
+	mDen = rhs.mDen;
+
+	return *this;
+      };
+
     };
 
     /*
@@ -171,17 +206,23 @@ namespace android
 	: MPDRatio() 
       {};
 
-      MPDFrameRate(const MPDFrameRate &copy)
-	: MPDRatio(copy.mNum, copy.mDen) 
-      {};
-
       MPDFrameRate(uint32_t num, uint32_t den)
 	: MPDRatio(num, den) 
       {};
 
       virtual ~MPDFrameRate() {};
 
-      MPDFrameRate & operator=(const MPDFrameRate &rhs) {mNum = rhs.mNum; mDen = rhs.mDen; return *this;};
+      MPDFrameRate(const MPDFrameRate &copy)
+	: MPDRatio(copy.mNum, copy.mDen) 
+      {};
+
+      MPDFrameRate & operator=(const MPDFrameRate &rhs) 
+      {
+	mNum = rhs.mNum; 
+	mDen = rhs.mDen; 
+
+	return *this;
+      };
     };
 
     /*
@@ -203,7 +244,19 @@ namespace android
       bool mFlag;
       uint32_t mValue;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDConditionalUintType);
+      MPDConditionalUintType(const MPDConditionalUintType &copyin) 
+	: RefBase()
+      {
+	mFlag = copyin.mFlag;
+	mValue = copyin.mValue;
+      };
+
+      MPDConditionalUintType & operator=(const MPDConditionalUintType &rhs) {
+	mFlag = rhs.mFlag;
+	mValue = rhs.mValue;
+	
+	return *this;
+      };
     };
 
     /*
@@ -216,27 +269,27 @@ namespace android
 	  mD(d),
 	  mR(r) 
       {};
-      MPD_SNode(const MPD_SNode &rhv)
-	: RefBase(),
-	  mT(rhv.mT),
-	  mD(rhv.mD),
-	  mR(rhv.mR) 
-      {};
+
       virtual ~MPD_SNode() {};
 
       uint64_t mT;
       uint64_t mD;
       uint32_t mR;
-      
+
+      MPD_SNode(const MPD_SNode &copyin)
+	: RefBase(),
+	  mT(copyin.mT),
+	  mD(copyin.mD),
+	  mR(copyin.mR)
+      {};	  
       MPD_SNode & operator=(const MPD_SNode &rhv)
       {
-	this->mT = rhv.mT;
-	this->mD = rhv.mD;
-	this->mR = rhv.mR;
+	mT = rhv.mT;
+	mD = rhv.mD;
+	mR = rhv.mR;
+
 	return *this;
       };
-
-      //      ALLOW_EVIL_CONSTRUCTORS(MPD_SNode);
     };
 
     /*
@@ -256,7 +309,16 @@ namespace android
 
       vector<MPD_SNode> *mSNodes;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentTimelineNode);
+      MPDSegmentTimelineNode(const MPDSegmentTimelineNode &copyin) 
+	: RefBase()
+      {
+	mSNodes = new vector<MPD_SNode>(*copyin.mSNodes);
+      };
+      MPDSegmentTimelineNode & operator=(const MPDSegmentTimelineNode &rhs) {
+	mSNodes = new vector<MPD_SNode>(*rhs.mSNodes);
+
+	return *this;
+      };
     };
 
     /*
@@ -281,8 +343,18 @@ namespace android
       AString mSourceUrl;
       MPDRange *mRange;
 
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDUrlType);
+      MPDUrlType(const MPDUrlType &copyin)
+	: RefBase(),
+	  mSourceUrl(copyin.mSourceUrl),
+	  mRange(new MPDRange(*copyin.mRange))
+      {};
+      MPDUrlType &operator=(const MPDUrlType &rhs)
+      {
+	mSourceUrl = rhs.mSourceUrl;
+	mRange = new MPDRange(*rhs.mRange);
+
+	return *this;
+      };
     };
 
     /*
@@ -309,8 +381,27 @@ namespace android
       MPDUrlType *mInitialization;
       MPDUrlType *mRepresentationIndex;
 
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentBaseType);
+      MPDSegmentBaseType(const MPDSegmentBaseType &copyin)
+	: RefBase()
+      {
+	mTimescale = copyin.mTimescale;
+	mPresentationTimeOffset = copyin.mPresentationTimeOffset;
+	mIndexRange = new MPDRange(*copyin.mIndexRange);
+	mIndexRangeExact = copyin.mIndexRangeExact;
+	mInitialization = new MPDUrlType(*copyin.mInitialization);
+	mRepresentationIndex = new MPDUrlType(*copyin.mRepresentationIndex);
+      };
+      MPDSegmentBaseType &operator=(const MPDSegmentBaseType &rhs)
+      {
+	mTimescale = rhs.mTimescale;
+	mPresentationTimeOffset = rhs.mPresentationTimeOffset;
+	mIndexRange = new MPDRange(*rhs.mIndexRange);
+	mIndexRangeExact = rhs.mIndexRangeExact;
+	mInitialization = new MPDUrlType(*rhs.mInitialization);
+	mRepresentationIndex = new MPDUrlType(*rhs.mRepresentationIndex);
+	
+	return *this;
+      };
     };
 
     /*
@@ -334,7 +425,25 @@ namespace android
       MPDSegmentTimelineNode *mSegmentTimeline;
       MPDUrlType *mBitstreamSwitching;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDMultSegmentBaseType);
+      MPDMultSegmentBaseType(const MPDMultSegmentBaseType &copyin) 
+	: RefBase(),
+	  mDuration(copyin.mDuration),
+	  mStartNumber(copyin.mStartNumber),
+	  mSegmentBaseType(new MPDSegmentBaseType(*copyin.mSegmentBaseType)),
+	  mSegmentTimeline(new MPDSegmentTimelineNode(*copyin.mSegmentTimeline)),
+	  mBitstreamSwitching(new MPDUrlType(*copyin.mBitstreamSwitching))
+      {};
+
+      MPDMultSegmentBaseType & operator=(const MPDMultSegmentBaseType &rhs) {
+	mDuration = rhs.mDuration;
+	mStartNumber = rhs.mStartNumber;
+	mSegmentBaseType = new MPDSegmentBaseType(*rhs.mSegmentBaseType);
+	mSegmentTimeline = new MPDSegmentTimelineNode(*rhs.mSegmentTimeline);
+	mBitstreamSwitching = new MPDUrlType(*rhs.mBitstreamSwitching);
+
+	return *this;
+      };
+      
     };
 
     /*
@@ -358,7 +467,19 @@ namespace android
       MPDMultSegmentBaseType *mMultSegBaseType;
       vector<MPDSegmentUrlNode> *mSegmentUrlNodes;
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentListNode);
+      MPDSegmentListNode(const MPDSegmentListNode &copyin) 
+	: RefBase(),
+	  mMultSegBaseType(new MPDMultSegmentBaseType(*copyin.mMultSegBaseType)),
+	  mSegmentUrlNodes(new vector<MPDSegmentUrlNode>(*copyin.mSegmentUrlNodes))
+      {};
+
+      MPDSegmentListNode &operator=(const MPDSegmentListNode &rhs) 
+      {
+	mMultSegBaseType = new MPDMultSegmentBaseType(*rhs.mMultSegBaseType);
+	mSegmentUrlNodes = new vector<MPDSegmentUrlNode>(*rhs.mSegmentUrlNodes);
+
+	return *this;
+      };
     };
 
     /*
@@ -382,7 +503,24 @@ namespace android
       AString mInitialization;
       AString mBitstreamSwitching;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentTemplateNode);
+      MPDSegmentTemplateNode(const MPDSegmentTemplateNode &copyin) 
+	: RefBase(),
+	  mMultSegBaseType(new MPDMultSegmentBaseType(*copyin.mMultSegBaseType)),
+	  mMedia(copyin.mMedia),
+	  mIndex(copyin.mIndex),
+	  mInitialization(copyin.mInitialization),
+	  mBitstreamSwitching(copyin.mBitstreamSwitching)
+      {};
+
+      MPDSegmentTemplateNode &operator=(const MPDSegmentTemplateNode &rhs) {
+	mMultSegBaseType = new MPDMultSegmentBaseType(*rhs.mMultSegBaseType);
+	mMedia = rhs.mMedia;
+	mIndex = rhs.mIndex;
+	mInitialization = rhs.mInitialization;
+	mBitstreamSwitching = rhs.mBitstreamSwitching;
+
+	return *this;
+      };
     };
 
     /*
@@ -404,7 +542,22 @@ namespace android
       AString mIndex;
       MPDRange *mIndexRange;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDSegmentUrlNode);
+      MPDSegmentUrlNode(const MPDSegmentUrlNode &copyin) 
+	: RefBase(),
+	  mMedia(copyin.mMedia),
+	  mMediaRange(new MPDRange(*copyin.mMediaRange)),
+	  mIndex(copyin.mIndex),
+	  mIndexRange(new MPDRange(*copyin.mIndexRange))
+      {};
+
+      MPDSegmentUrlNode &operator=(const MPDSegmentUrlNode &rhs) {
+	mMedia = rhs.mMedia;
+	mMediaRange = new MPDRange(*rhs.mMediaRange);
+	mIndex = rhs.mIndex;
+	mIndexRange = new MPDRange(*rhs.mIndexRange);
+
+	return *this;
+      };
     };
 
     /*
@@ -463,7 +616,49 @@ namespace android
       vector<MPDDescriptorType> mAudioChannelConfiguration;
       vector<MPDDescriptorType> mContentProtection;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDRepresentationBaseType);
+      MPDRepresentationBaseType(const MPDRepresentationBaseType &copyin) 
+	: RefBase(),
+	  mProfiles(copyin.mProfiles),
+	  mWidth(copyin.mWidth),
+	  mHeight(copyin.mHeight),
+	  mSar(new MPDRatio(*copyin.mSar)),
+	  mFrameRate(new MPDFrameRate(*copyin.mFrameRate)),
+	  mAudioSamplingRate(copyin.mAudioSamplingRate),
+	  mMimeType(copyin.mMimeType),
+	  mSegmentProfiles(copyin.mSegmentProfiles),
+	  mCodecs(copyin.mCodecs),
+	  mMaximumSAPPeriod(copyin.mMaximumSAPPeriod),
+	  mStartWithSAP(copyin.mStartWithSAP),
+	  mMaxPlayoutRate(copyin.mMaxPlayoutRate),
+	  mCodingDependency(copyin.mCodingDependency),
+	  mScanType(copyin.mScanType),
+	  mFramePacking(vector<MPDDescriptorType>(copyin.mFramePacking)),
+	  mAudioChannelConfiguration(vector<MPDDescriptorType>(copyin.mAudioChannelConfiguration)),
+	  mContentProtection(vector<MPDDescriptorType>(copyin.mContentProtection))
+      {};
+
+      MPDRepresentationBaseType &operator=(const MPDRepresentationBaseType &rhs) {
+	mProfiles = rhs.mProfiles;
+	mWidth = rhs.mWidth;
+	mHeight = rhs.mHeight;
+	mSar = new MPDRatio(*rhs.mSar);
+	mFrameRate = new MPDFrameRate(*rhs.mFrameRate);
+	mAudioSamplingRate = rhs.mAudioSamplingRate;
+	mMimeType = rhs.mMimeType;
+	mSegmentProfiles = rhs.mSegmentProfiles;
+	mCodecs = rhs.mCodecs;
+	mMaximumSAPPeriod = rhs.mMaximumSAPPeriod;
+	mStartWithSAP = rhs.mStartWithSAP;
+	mMaxPlayoutRate = rhs.mMaxPlayoutRate;
+	mCodingDependency = rhs.mCodingDependency;
+	mScanType = rhs.mScanType;
+	mFramePacking = vector<MPDDescriptorType>(rhs.mFramePacking);
+	mAudioChannelConfiguration = vector<MPDDescriptorType>(rhs.mAudioChannelConfiguration) ;
+	mContentProtection = vector<MPDDescriptorType>(rhs.mContentProtection);
+
+	return *this;
+      };
+
     };
 
     /*
@@ -491,7 +686,26 @@ namespace android
       uint32_t mBandwidth;
       vector<AString> mContentComponent;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDSubRepresentationNode);
+      MPDSubRepresentationNode(const MPDSubRepresentationNode &copyin)
+	: RefBase(),
+	  mRepresentationBase(new MPDRepresentationBaseType(*copyin.mRepresentationBase)),
+	  mLevel(copyin.mLevel),
+	  mDependencyLevel(vector<uint32_t>(copyin.mDependencyLevel)),
+	  mSize(copyin.mSize),
+	  mBandwidth(copyin.mBandwidth),
+	  mContentComponent(vector<AString>(copyin.mContentComponent))
+      {};
+
+       MPDSubRepresentationNode &operator=(const MPDSubRepresentationNode &rhs) {
+	mRepresentationBase = new MPDRepresentationBaseType(*rhs.mRepresentationBase);
+	mLevel = rhs.mLevel;
+	mDependencyLevel = vector<uint32_t>(rhs.mDependencyLevel);
+	mSize = rhs.mSize;
+	mBandwidth = rhs.mBandwidth;
+	mContentComponent = vector<AString>(rhs.mContentComponent);
+
+	return *this;
+      };
     };
 
     /*
@@ -539,7 +753,37 @@ namespace android
       /* SegmentList node */
       MPDSegmentListNode *mSegmentList;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDRepresentationNode);
+      MPDRepresentationNode(const MPDRepresentationNode &copyin) 
+	: RefBase(),
+	  mId(copyin.mId),
+	  mBandwidth(copyin.mBandwidth),
+	  mQualityRanking(copyin.mQualityRanking),
+	  mDependencyId(vector<AString>(copyin.mDependencyId)),
+	  mMediaStreamStructureId(vector<AString>(copyin.mMediaStreamStructureId)),
+	  mRepresentationBase(new MPDRepresentationBaseType(*copyin.mRepresentationBase)),
+	  mBaseUrls(vector<MPDBaseUrl>(copyin.mBaseUrls)),
+	  mSubRepresentations(vector<MPDSubRepresentationNode>(copyin.mSubRepresentations)),
+	  mSegmentBase(new MPDSegmentBaseType(*copyin.mSegmentBase)),
+	  mSegmentTemplate(new MPDSegmentTemplateNode(*copyin.mSegmentTemplate)),
+	  mSegmentList(new MPDSegmentListNode(*copyin.mSegmentList))
+      {};
+
+      MPDRepresentationNode &operator=(const MPDRepresentationNode &rhs) {
+	mId = rhs.mId;
+	mBandwidth = rhs.mBandwidth;
+	mQualityRanking = rhs.mQualityRanking;
+	mDependencyId = vector<AString>(rhs.mDependencyId);
+	mMediaStreamStructureId = vector<AString>(rhs.mMediaStreamStructureId);
+	mRepresentationBase = new MPDRepresentationBaseType(*rhs.mRepresentationBase);
+	mBaseUrls = vector<MPDBaseUrl>(rhs.mBaseUrls);
+	mSubRepresentations = vector<MPDSubRepresentationNode>(rhs.mSubRepresentations);
+	mSegmentBase = new MPDSegmentBaseType(*rhs.mSegmentBase);
+	mSegmentTemplate = new MPDSegmentTemplateNode(*rhs.mSegmentTemplate);
+	mSegmentList = new MPDSegmentListNode(*rhs.mSegmentList);
+
+	return *this;
+      };
+
     };
 
     /*
@@ -558,7 +802,20 @@ namespace android
       AString mSchemeIdUri;
       AString mValue;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDDescriptorType);
+      MPDDescriptorType(const MPDDescriptorType &copyin) 
+	: RefBase(),
+	  mSchemeIdUri(copyin.mSchemeIdUri),
+	  mValue(copyin.mValue)
+      {};
+      
+      MPDDescriptorType &operator=(const MPDDescriptorType &rhs) {
+	mSchemeIdUri = rhs.mSchemeIdUri;
+	mValue = rhs.mValue;
+
+	return *this;
+      };
+
+
     };
 
     /*
@@ -595,7 +852,30 @@ namespace android
       /* list of Viewpoint DescriptorType nodes */
       vector<MPDDescriptorType> mViewpoint;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDContentComponentNode);
+      MPDContentComponentNode (const MPDContentComponentNode &copyin)
+	: RefBase(),
+	  mId(copyin.mId),
+	  mLang(copyin.mLang),
+	  mContentType(copyin.mContentType),
+	  mPar(new MPDRatio(*copyin.mPar)),
+	  mAccessibility(vector<MPDDescriptorType>(copyin.mAccessibility)),
+	  mRole(vector<MPDDescriptorType>(copyin.mRole)),
+	  mRating(vector<MPDDescriptorType>(copyin.mRating)),
+	  mViewpoint(vector<MPDDescriptorType>(copyin.mViewpoint))
+      {};
+      MPDContentComponentNode &operator=(const MPDContentComponentNode &rhs)
+      {
+	mId = rhs.mId;
+	mLang = rhs.mLang;
+	mContentType = rhs.mContentType;
+	mPar = new MPDRatio(*rhs.mPar);
+	mAccessibility = vector<MPDDescriptorType>(rhs.mAccessibility);
+	mRole = vector<MPDDescriptorType>(rhs.mRole);
+	mRating = vector<MPDDescriptorType>(rhs.mRating);
+	mViewpoint = vector<MPDDescriptorType>(rhs.mViewpoint);
+
+	return *this;
+      };
     };
 
     /*
@@ -686,7 +966,71 @@ namespace android
       /* list of ContentComponent nodes */
       vector<MPDContentComponentNode> mContentComponents;
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDAdaptationSetNode);
+      MPDAdaptationSetNode (const MPDAdaptationSetNode &copyin)
+	: RefBase(),
+	  mId(copyin.mId),
+	  mGroup(copyin.mGroup),
+	  mLang(copyin.mLang),
+	  mContentType(copyin.mContentType),
+	  mPar(new MPDRatio(*copyin.mPar)),
+	  mMinBandwidth(copyin.mMinBandwidth),
+	  mMaxBandwidth(copyin.mMaxBandwidth),
+	  mMinWidth(copyin.mMinWidth),
+	  mMaxWidth(copyin.mMaxWidth),
+	  mMinHeight(copyin.mMinHeight),
+	  mMaxHeight(copyin.mMaxHeight),
+	  mMinFrameRate(new MPDFrameRate(*copyin.mMinFrameRate)),
+	  mMaxFrameRate(new MPDFrameRate(*copyin.mMaxFrameRate)),
+	  mSegmentAlignment(new MPDConditionalUintType(*copyin.mSegmentAlignment)),
+	  mSubSegmentAlignment(new MPDConditionalUintType(*copyin.mSubSegmentAlignment)),
+	  mSubSegmentStartsWithSAP(copyin.mSubSegmentStartsWithSAP),
+	  mBitstreamSwitching(copyin.mBitstreamSwitching),
+	  mAccessibility(vector<MPDDescriptorType>(copyin.mAccessibility)),
+	  mRole(vector<MPDDescriptorType>(copyin.mRole)),
+	  mRating(vector<MPDDescriptorType>(copyin.mRating)),
+	  mViewpoint(vector<MPDDescriptorType>(copyin.mViewpoint)),
+	  mRepresentationBase(copyin.mRepresentationBase),
+	  mSegmentBase(new MPDSegmentBaseType(*copyin.mSegmentBase)),
+	  mSegmentList(new MPDSegmentListNode(*copyin.mSegmentList)),
+	  mSegmentTemplate(copyin.mSegmentTemplate),
+	  mBaseUrls(copyin.mBaseUrls),
+	  mRepresentations(copyin.mRepresentations),
+	  mContentComponents(copyin.mContentComponents)
+      {};
+
+      MPDAdaptationSetNode &operator=(const MPDAdaptationSetNode &rhs)
+      {
+	mId = rhs.mId;
+	mGroup = rhs.mGroup;
+	mLang = rhs.mLang;
+	mContentType = rhs.mContentType;
+	mPar = new MPDRatio(*rhs.mPar);
+	mMinBandwidth = rhs.mMinBandwidth;
+	mMaxBandwidth = rhs.mMaxBandwidth;
+	mMinWidth = rhs.mMinWidth;
+	mMaxWidth = rhs.mMaxWidth;
+	mMinHeight = rhs.mMinHeight;
+	mMaxHeight = rhs.mMaxHeight;
+	mMinFrameRate = new MPDFrameRate(*rhs.mMinFrameRate);
+	mMaxFrameRate = new MPDFrameRate(*rhs.mMaxFrameRate);
+	mSegmentAlignment = new MPDConditionalUintType(*rhs.mSegmentAlignment);
+	mSubSegmentAlignment = new MPDConditionalUintType(*rhs.mSubSegmentAlignment);
+	mSubSegmentStartsWithSAP = rhs.mSubSegmentStartsWithSAP;
+	mBitstreamSwitching = rhs.mBitstreamSwitching;
+	mAccessibility = vector<MPDDescriptorType>(rhs.mAccessibility);
+	mRole = vector<MPDDescriptorType>(rhs.mRole);
+	mRating = vector<MPDDescriptorType>(rhs.mRating);
+	mViewpoint = vector<MPDDescriptorType>(rhs.mViewpoint);
+	mRepresentationBase = rhs.mRepresentationBase;
+	mSegmentBase = new MPDSegmentBaseType(*rhs.mSegmentBase);
+	mSegmentList = new MPDSegmentListNode(*rhs.mSegmentList);
+	mSegmentTemplate = rhs.mSegmentTemplate;
+	mBaseUrls = rhs.mBaseUrls;
+	mRepresentations = rhs.mRepresentations;
+	mContentComponents = rhs.mContentComponents;
+
+	return *this;
+      };
     };
 
     /*
@@ -702,7 +1046,19 @@ namespace android
       vector<uint32_t> mContains;                   /* UIntVectorType */
       uint32_t mSize;                               /* size of the "contains" array */
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDSubsetNode);
+      MPDSubsetNode(const MPDSubsetNode &copyin)
+	: RefBase(),
+	  mContains(vector<uint32_t>(copyin.mContains)),
+	  mSize(copyin.mSize)
+      {};
+
+      MPDSubsetNode &operator=(const MPDSubsetNode &rhs)
+      {
+	mContains = vector<uint32_t>(rhs.mContains);
+	mSize = rhs.mSize;
+
+	return *this;
+      };
     };
 
     /*
@@ -741,7 +1097,35 @@ namespace android
       /* list of BaseUrl nodes */
       vector<MPDBaseUrl> mBaseUrls;
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDPeriodNode);
+      MPDPeriodNode(const MPDPeriodNode &copyin)
+	: RefBase(),
+	  mId(copyin.mId),
+	  mStart(copyin.mStart),
+	  mDuration(copyin.mDuration),
+	  mBitstreamSwitching(copyin.mBitstreamSwitching),
+	  mSegmentBase(new MPDSegmentBaseType(*copyin.mSegmentBase)),
+	  mSegmentList(new MPDSegmentListNode(*copyin.mSegmentList)),
+	  mSegmentTemplate(new MPDSegmentTemplateNode(*copyin.mSegmentTemplate)),
+	  mAdaptationSets(vector<MPDAdaptationSetNode>(copyin.mAdaptationSets)),
+	  mSubsets(vector<MPDSubsetNode>(copyin.mSubsets)),
+	  mBaseUrls(vector<MPDBaseUrl>(copyin.mBaseUrls))
+      {};
+
+      MPDPeriodNode &operator=(const MPDPeriodNode &rhs)
+      {
+	mId = rhs.mId;
+	mStart = rhs.mStart;
+	mDuration = rhs.mDuration;
+	mBitstreamSwitching = rhs.mBitstreamSwitching;
+	mSegmentBase = new MPDSegmentBaseType(*rhs.mSegmentBase);
+	mSegmentList = new MPDSegmentListNode(*rhs.mSegmentList);
+	mSegmentTemplate = new MPDSegmentTemplateNode(*rhs.mSegmentTemplate);
+	mAdaptationSets = vector<MPDAdaptationSetNode>(rhs.mAdaptationSets);
+	mSubsets = vector<MPDSubsetNode>(rhs.mSubsets);
+	mBaseUrls = vector<MPDBaseUrl>(rhs.mBaseUrls);
+
+	return *this;
+      };
     };
 
     /*
@@ -764,7 +1148,25 @@ namespace android
       AString mSource;
       AString mCopyright;
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDProgramInformationNode);
+      MPDProgramInformationNode(const MPDProgramInformationNode &copyin)
+	: RefBase(),
+	  mLang(copyin.mLang),
+	  mMoreInformationURL(copyin.mMoreInformationURL),
+	  mTitle(copyin.mTitle),
+	  mSource(copyin.mSource),
+	  mCopyright(copyin.mCopyright)
+      {};
+
+      MPDProgramInformationNode &operator=(const MPDProgramInformationNode &rhs)
+      {
+	mLang = rhs.mLang;
+	mMoreInformationURL = rhs.mMoreInformationURL;
+	mTitle = rhs.mTitle;
+	mSource = rhs.mSource;
+	mCopyright = rhs.mCopyright;
+
+	return *this;
+      };
     };
 
     /*
@@ -780,7 +1182,19 @@ namespace android
       int64_t mStarttime;                  /* [ms] */
       int64_t mDuration;                   /* [ms] */
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDMetricsRangeNode);
+      MPDMetricsRangeNode(const MPDMetricsRangeNode &copyin)
+	: RefBase(),
+	  mStarttime(copyin.mStarttime),
+	  mDuration(copyin.mDuration)
+      {};
+
+      MPDMetricsRangeNode &operator=(const MPDMetricsRangeNode &rhs)
+      {
+	mStarttime = rhs.mStarttime;
+	mDuration = rhs.mDuration;
+
+	return *this;
+      };
     };
 
     /*
@@ -800,7 +1214,21 @@ namespace android
       /* list of Reporting nodes */
       vector<MPDDescriptorType> mReportings;
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDMetricsNode);
+      MPDMetricsNode(const MPDMetricsNode &copyin)
+	: RefBase(),
+	  mMetrics(copyin.mMetrics),
+	  mMetricsRanges(vector<MPDMetricsRangeNode>(copyin.mMetricsRanges)),
+	  mReportings(vector<MPDDescriptorType>(copyin.mReportings))
+      {};
+
+      MPDMetricsNode &operator=(const MPDMetricsNode &rhs)
+      {
+	mMetrics = rhs.mMetrics;
+	mMetricsRanges = vector<MPDMetricsRangeNode>(rhs.mMetricsRanges);
+	mReportings = vector<MPDDescriptorType>(rhs.mReportings);
+
+	return *this;
+      };
     };
 
     /*
@@ -835,7 +1263,6 @@ namespace android
 
       virtual ~MPDDateTime() {};
 
-    private:
       uint16_t mYear;
       uint8_t mMonth;
       uint8_t mDay;
@@ -843,8 +1270,28 @@ namespace android
       uint8_t mMinute;
       uint8_t mSecond;
 
-    public:
-      ALLOW_EVIL_CONSTRUCTORS(MPDDateTime);
+      MPDDateTime(const MPDDateTime &copyin)
+	: RefBase()
+      {
+	mYear = copyin.mYear;
+	mMonth = copyin.mMonth;
+	mDay = copyin.mDay;
+	mHour = copyin.mHour;
+	mMinute = copyin.mMinute;
+	mSecond = copyin.mSecond;
+      };
+
+      MPDDateTime &operator=(const MPDDateTime &rhs)
+      {
+	mYear = rhs.mYear;
+	mMonth = rhs.mMonth;
+	mDay = rhs.mDay;
+	mHour = rhs.mHour;
+	mMinute = rhs.mMinute;
+	mSecond = rhs.mSecond;
+
+	return *this;
+      };
     };
 
     /*
@@ -930,7 +1377,57 @@ namespace android
 	mMetrics.clear(); 
       };
 
-      ALLOW_EVIL_CONSTRUCTORS(MPDMpdNode);
+      MPDMpdNode(const MPDMpdNode &copyin)
+	: RefBase(),
+	  mDefault_namespace(copyin.mDefault_namespace),
+	  mNamespace_xsi(copyin.mNamespace_xsi),
+	  mNamespace_ext(copyin.mNamespace_ext),
+	  mSchemaLocation(copyin.mSchemaLocation),
+	  mId(copyin.mId),
+	  mProfiles(copyin.mProfiles),
+	  mType(copyin.mType),
+	  mAvailabilityStartTime(copyin.mAvailabilityStartTime),
+	  mAvailabilityEndTime(copyin.mAvailabilityEndTime),
+	  mMediaPresentationDuration(copyin.mMediaPresentationDuration),
+	  mMinimumUpdatePeriod(copyin.mMinimumUpdatePeriod),
+	  mMinBufferTime(copyin.mMinBufferTime),
+	  mTimeShiftBufferDepth(copyin.mTimeShiftBufferDepth),
+	  mSuggestedPresentationDelay(copyin.mSuggestedPresentationDelay),
+	  mMaxSegmentDuration(copyin.mMaxSegmentDuration),
+	  mMaxSubSegmentDuration(copyin.mMaxSubSegmentDuration),
+	  mBaseUrls(vector<MPDBaseUrl>(copyin.mBaseUrls)),
+	  mLocations(vector<AString>(copyin.mLocations)),
+	  mProgramInfo(vector<MPDProgramInformationNode>(copyin.mProgramInfo)),
+	  mPeriods(vector<MPDPeriodNode>(copyin.mPeriods)),
+	  mMetrics(vector<MPDMetricsNode>(copyin.mMetrics))
+      {};
+      
+      MPDMpdNode &operator=(const MPDMpdNode &rhs)
+      {
+	mDefault_namespace = rhs.mDefault_namespace;
+	mNamespace_xsi = rhs.mNamespace_xsi;
+	mNamespace_ext = rhs.mNamespace_ext;
+	mSchemaLocation = rhs.mSchemaLocation;
+	mId = rhs.mId;
+	mProfiles = rhs.mProfiles;
+	mType = rhs.mType;
+	mAvailabilityStartTime = rhs.mAvailabilityStartTime;
+	mAvailabilityEndTime = rhs.mAvailabilityEndTime;
+	mMediaPresentationDuration = rhs.mMediaPresentationDuration;
+	mMinimumUpdatePeriod = rhs.mMinimumUpdatePeriod;
+	mMinBufferTime = rhs.mMinBufferTime;
+	mTimeShiftBufferDepth = rhs.mTimeShiftBufferDepth;
+	mSuggestedPresentationDelay = rhs.mSuggestedPresentationDelay;
+	mMaxSegmentDuration = rhs.mMaxSegmentDuration;
+	mMaxSubSegmentDuration = rhs.mMaxSubSegmentDuration;
+	mBaseUrls = vector<MPDBaseUrl>(rhs.mBaseUrls);
+	mLocations = vector<AString>(rhs.mLocations);
+	mProgramInfo = vector<MPDProgramInformationNode>(rhs.mProgramInfo);
+	mPeriods = vector<MPDPeriodNode>(rhs.mPeriods);
+	mMetrics = vector<MPDMetricsNode>(rhs.mMetrics);
+
+	return *this;
+      };
     };
 
     /*
@@ -943,7 +1440,24 @@ namespace android
       MPDClockTime mStart;
       MPDClockTime mDuration;
       
-      ALLOW_EVIL_CONSTRUCTORS(MPDStreamPeriod);
+      MPDStreamPeriod(const MPDStreamPeriod &copyin)
+	: RefBase()
+      {
+	mPeriod = MPDPeriodNode(copyin.mPeriod);
+	mNumber = copyin.mNumber;
+	mStart = copyin.mStart;
+	mDuration = copyin.mDuration;
+      };
+
+      MPDStreamPeriod &operator=(const MPDStreamPeriod &rhs)
+      {
+	mPeriod = MPDPeriodNode(rhs.mPeriod);
+	mNumber = rhs.mNumber;
+	mStart = rhs.mStart;
+	mDuration = rhs.mDuration;
+
+	return *this;
+      };
     };
 
     /*
@@ -957,8 +1471,24 @@ namespace android
       MPDClockTime mStart_time;                    /* segment start time */
       MPDClockTime mDuration;                      /* segment duration */
 
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDMediaSegment);
+      MPDMediaSegment(const MPDMediaSegment &copyin)
+	: RefBase()
+      {
+	mSegmentURL = new MPDSegmentUrlNode(*copyin.mSegmentURL);
+	mNumber = copyin.mNumber;
+	mStart = copyin.mStart;
+	mDuration = copyin.mDuration;
+      };
+
+      MPDMediaSegment &operator=(const MPDMediaSegment &rhs)
+      {
+	mSegmentURL = new MPDSegmentUrlNode(*rhs.mSegmentURL);
+	mNumber = rhs.mNumber;
+	mStart = rhs.mStart;
+	mDuration = rhs.mDuration;
+
+	return *this;
+      };
     };
 
     /*
@@ -978,8 +1508,34 @@ namespace android
       MPDClockTime mTimestamp;
       MPDClockTime mDuration;      
 
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDMediaFragmentInfo);
+      MPDMediaFragmentInfo(const MPDMediaFragmentInfo &copyin)
+	: RefBase()
+      {
+	mUri = copyin.mUri;
+	mRangeStart = copyin.mRangeStart;
+	mRangeEnd = copyin.mRangeEnd;
+	mIndexUri = copyin.mIndexUri;
+	mIndexRangeStart = copyin.mIndexRangeStart;
+	mIndexRangeEnd = copyin.mIndexRangeEnd;
+	mDiscontinuity = copyin.mDiscontinuity;
+	mTimestamp = copyin.mTimestamp;
+	mDuration = copyin.mDuration;
+      };
+
+      MPDMediaFragmentInfo &operator=(const MPDMediaFragmentInfo &rhs)
+      {
+	mUri = rhs.mUri;
+	mRangeStart = rhs.mRangeStart;
+	mRangeEnd = rhs.mRangeEnd;
+	mIndexUri = rhs.mIndexUri;
+	mIndexRangeStart = rhs.mIndexRangeStart;
+	mIndexRangeEnd = rhs.mIndexRangeEnd;
+	mDiscontinuity = rhs.mDiscontinuity;
+	mTimestamp = rhs.mTimestamp;
+	mDuration = rhs.mDuration;
+
+	return *this;
+      };
     };
 
     /*
@@ -1003,8 +1559,42 @@ namespace android
       uint32_t mSegmentIdx;                       /* index of next sequence chunk */
       vector<MPDMediaSegment> mSegments;          /* array of MPDMediaSegment */
       
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDActiveStream);
+      MPDActiveStream(const MPDActiveStream &copyin)
+	: RefBase()
+      {
+	mimeType = copyin.mimeType;
+	mBaseUrlIdx = copyin.mBaseUrlIdx;
+	mBaseUrl = copyin.mBaseUrl;
+	mQueryUrl = copyin.mQueryUrl;
+	mMaxBandwidth = copyin.mMaxBandwidth;
+	mCurAdaptSet = new MPDAdaptationSetNode(*copyin.mCurAdaptSet);
+	mRepresentationIdx = copyin.mRepresentationIdx;
+	mCurRepresentation = new MPDRepresentationNode(*copyin.mCurRepresentation);
+	mCurSegmentBase = new MPDSegmentBaseType(*copyin.mCurSegmentBase);
+	mCurSegmentList = new MPDSegmentListNode(*copyin.mCurSegmentList);
+	mCurSegTemplate = new MPDSegmentTemplateNode(*copyin.mCurSegTemplate);;
+	mSegmentIdx = copyin.mSegmentIdx;
+	mSegments = vector<MPDMediaSegment>(mSegments);
+      };
+
+      MPDActiveStream &operator=(const MPDActiveStream &rhs)
+      {
+	mimeType = rhs.mimeType;
+	mBaseUrlIdx = rhs.mBaseUrlIdx;
+	mBaseUrl = rhs.mBaseUrl;
+	mQueryUrl = rhs.mQueryUrl;
+	mMaxBandwidth = rhs.mMaxBandwidth;
+	mCurAdaptSet = new MPDAdaptationSetNode(*rhs.mCurAdaptSet);
+	mRepresentationIdx = rhs.mRepresentationIdx;
+	mCurRepresentation = new MPDRepresentationNode(*rhs.mCurRepresentation);
+	mCurSegmentBase = new MPDSegmentBaseType(*rhs.mCurSegmentBase);
+	mCurSegmentList = new MPDSegmentListNode(*rhs.mCurSegmentList);
+	mCurSegTemplate = new MPDSegmentTemplateNode(*rhs.mCurSegTemplate);;
+	mSegmentIdx = rhs.mSegmentIdx;
+	mSegments = vector<MPDMediaSegment>(mSegments);
+
+	return *this;
+      };
     };
 
     /*
@@ -1023,8 +1613,28 @@ namespace android
       AString mMpdUri;                            /* manifest file URI */
       Mutex mLock;
       
-    private:
-      ALLOW_EVIL_CONSTRUCTORS(MPDMpdClient);
+      MPDMpdClient(const MPDMpdClient &copyin)
+	: RefBase()
+      {
+	mMpdNode = new MPDMpdNode(*mMpdNode);
+	mPeriods = vector<MPDStreamPeriod>(mPeriods);
+	mPeriodIdx = copyin.mPeriodIdx;
+	mActiveStreams = vector<MPDActiveStream>(mActiveStreams);
+	mUpdateFailedCount = copyin.mUpdateFailedCount;
+	mMpdUri = copyin.mMpdUri;
+      };
+
+      MPDMpdClient &operator=(const MPDMpdClient &rhs)
+      {
+	mMpdNode = new MPDMpdNode(*mMpdNode);
+	mPeriods = vector<MPDStreamPeriod>(mPeriods);
+	mPeriodIdx = rhs.mPeriodIdx;
+	mActiveStreams = vector<MPDActiveStream>(mActiveStreams);
+	mUpdateFailedCount = rhs.mUpdateFailedCount;
+	mMpdUri = rhs.mMpdUri;
+
+	return *this;
+      };
     };
 
     /*
@@ -1040,7 +1650,20 @@ namespace android
       AString mUri;
       sp<AMessage> mMeta;
 
-      ALLOW_EVIL_CONSTRUCTORS(Item);
+      Item(const Item &copyin)
+	: RefBase()
+      {
+	mUri = copyin.mUri;
+	mMeta = sp<AMessage>(copyin.mMeta);
+      };
+
+      Item &operator=(const Item &rhs)
+      {
+	mUri = rhs.mUri;
+	mMeta = sp<AMessage>(rhs.mMeta);
+	
+	return *this;
+      };
     };
 
 
@@ -1050,7 +1673,6 @@ namespace android
 
     MPDMpdClient *mClient;
 
-  private:
     status_t mInitCheck;
 
     AString mBaseURI;
@@ -1064,7 +1686,31 @@ namespace android
 
     status_t parse(const void *data, size_t size);
 
-    ALLOW_EVIL_CONSTRUCTORS(MPDParser);
+    MPDParser(const MPDParser &copyin)
+      : RefBase(),
+	mInitCheck(copyin.mInitCheck),
+	mBaseURI(copyin.mBaseURI),
+	mIsComplete(copyin.mIsComplete),
+	mIsEvent(copyin.mIsEvent),
+	mIsVariant(copyin.mIsVariant),
+	mIsVariantComputed(copyin.mIsVariantComputed),
+	mMeta(sp<AMessage>(copyin.mMeta)),
+	mItems(Vector<Item>(copyin.mItems))
+    {};
+    
+    MPDParser &operator=(const MPDParser &rhs)
+    {
+      mInitCheck = rhs.mInitCheck;
+      mBaseURI = rhs.mBaseURI;
+      mIsComplete = rhs.mIsComplete;
+      mIsEvent = rhs.mIsEvent;
+      mIsVariant = rhs.mIsVariant;
+      mIsVariantComputed = rhs.mIsVariantComputed;
+      mMeta = sp<AMessage>(rhs.mMeta);
+      mItems = Vector<Item>(rhs.mItems);
+
+      return *this;
+    };
   };
 
 };

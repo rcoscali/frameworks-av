@@ -34,8 +34,6 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_MODULE:= mpdparser_test
 
-#LOCAL_ADDITIONAL_DEPENDENCIES := lib64utils libxml2
-
 LOCAL_C_INCLUDES:= \
 	$(TOP)/frameworks/av/include/media/stagefright/foundation \
 	$(TOP)/frameworks/av/include \
@@ -47,13 +45,14 @@ LOCAL_C_INCLUDES:= \
 	$(TOP)/external/icu4c/common                   \
 
 LOCAL_STATIC_LIBRARIES := \
-	libxml2 \
 	libutils
 
 LOCAL_SHARED_LIBRARIES := \
 	libicuuc          \
 	liblog
 
-LOCAL_LDLIBS := -lstdc++ -ldl
+LOCAL_CFLAGS := -O0 -g
+LOCAL_LDFLAGS := -O0 -g
+LOCAL_LDLIBS := -L/usr/lib/i386-linux-gnu -lxml2 /lib/i386-linux-gnu/liblzma.so.5.0.0 -lz -lstdc++ -ldl
 
 include $(BUILD_HOST_EXECUTABLE)

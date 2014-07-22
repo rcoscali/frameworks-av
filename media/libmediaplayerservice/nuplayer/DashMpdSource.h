@@ -23,6 +23,7 @@
 
 namespace android {
 
+ public:
   struct FragmentedMP4Parser;
   struct DashSession;
 

@@ -2006,7 +2006,7 @@ namespace android {
     xmlNode *cur_node;
     MPDParser::MPDMpdNode *new_mpd;
 
-    delete *an_mpdNode;
+    if (an_mpdNode && *an_mpdNode) delete *an_mpdNode;
     *an_mpdNode = new_mpd = new MPDParser::MPDMpdNode();
 
     ALOGV ("namespaces of root MPD node:");

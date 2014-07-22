@@ -96,6 +96,7 @@ namespace android
 
   sp<MetaData> NuPlayer::DashMpdSource::getFormatMeta(bool audio) 
   {
+    /*
     FragmentedMP4Parser::SourceType type =
       audio ? ATSParser::AUDIO : ATSParser::VIDEO;
 
@@ -103,6 +104,8 @@ namespace android
       static_cast<AnotherPacketSource *>(mTSParser->getSource(type).get());
 
     return (source == NULL ? NULL : source->getFormat());
+    */
+    return NULL;
   };
 
   status_t NuPlayer::DashMpdSource::feedMoreTSData() 
