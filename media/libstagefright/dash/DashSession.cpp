@@ -62,16 +62,16 @@ namespace android {
       mSeqNumber(-1),
       mSeekTimeUs(-1),
       mNumRetries(0),
-      mStartOfPlayback(true),
-      mDurationUs(-1),
-      mDurationFixed(false),
-      mSeekDone(false),
-      mDisconnectPending(false),
-      mMonitorQueueGeneration(0),
-      mRefreshState(INITIAL_MINIMUM_RELOAD_DELAY) 
-  {
-    if (mUIDValid)
+    mStartOfPlayback(true),
+    mDurationUs(-1),
+    mDurationFixed(false),
+    mSeekDone(false),
+    mDisconnectPending(false),
+    mMonitorQueueGeneration(0),
+    mRefreshState(INITIAL_MINIMUM_RELOAD_DELAY) {
+    if (mUIDValid) {
       mHTTPDataSource->setUID(mUID);
+    }
   }
 
   DashSession::~DashSession() {
@@ -88,8 +88,10 @@ namespace android {
     msg->setString("url", url);
 
     if (headers != NULL) 
-      msg->setPointer("headers",
-		      new KeyedVector<String8, String8>(*headers));
+      {
+	msg->setPointer("headers",
+			new KeyedVector<String8, String8>(*headers));
+      }
 
     msg->post();
   }
@@ -182,10 +184,8 @@ namespace android {
       headers = NULL;
     }
 
-    if ((mFlags & kFlagIncognito) != 0)
-      ALOGI("onConnect <URL suppressed>");
-    else
-      ALOGI("onConnect %s", url.c_str());
+    //ALOGI("onConnect <URL suppressed>");
+    ALOGI("onConnect %s", url.c_str());
 
     mMasterURL = url;
 
@@ -199,17 +199,15 @@ namespace android {
       return;
     }
 
-    if (mpd->isVariantManifest()) 
-      {
-	for (size_t i = 0; i < mpd->size(); ++i) 
-	  {
-	    BandwidthItem item;
-	    
-	    sp<AMessage> meta;
-	    mpd->itemAt(i, &item.mURI, &meta);
-	    
-	    unsigned long bandwidth;
-	    CHECK(meta->findInt32("bandwidth", (int32_t *)&item.mBandwidth));
+    if (mpd->size() > 1) {
+      for (size_t i = 0; i < mpd->size(); ++i) {
+	BandwidthItem item;
+
+	sp<AMessage> meta;
+	mpd->itemAt(i, &item.mURI, &meta);
+
+	unsigned long bandwidth;
+	CHECK(meta->findInt32("bandwidth", (int32_t *)&item.mBandwidth));
 
 	mBandwidthItems.push(item);
       }
@@ -563,64 +561,31 @@ namespace android {
 	    url = mMasterURL;
 	  }
 
-	if ((ssize_t)bandwidthIndex != mPrevBandwidthIndex) 
+	if (!mMpd->isComplete() && !mMpd->isEvent()) 
 	  {
-	    // If we switch bandwidths, do not pay any heed to whether
-	    // MPD changed since the last time...
-	    mMpd.clear();
-	  }
-
-	bool unchanged;
-	sp<MPDParser> mpd = fetchMpd(url.c_str(), &unchanged);
-	if (mpd == NULL) 
-	  {
-	    if (unchanged) 
-	      {
-		// We succeeded in fetching the MPD, but it was
-		// unchanged from the last time we tried.
-	      } 
-	    else 
-	      {
-		ALOGE("failed to load MPD at url '%s'", url.c_str());
-		signalEOS(ERROR_IO);
-		
-		return;
-	      }
+	    mDurationUs = -1;
+	    mDurationFixed = true;
 	  } 
 	else 
 	  {
-	    mMpd = mpd;
-	  }
-
-	if (!mDurationFixed) 
-	  {
-	    Mutex::Autolock autoLock(mLock);
-	    
-	    if (!mMpd->isComplete() && !mMpd->isEvent()) 
+	    mDurationUs = 0;
+	    for (size_t i = 0; i < mMpd->size(); ++i) 
 	      {
-		mDurationUs = -1;
-		mDurationFixed = true;
-	      } 
-	    else 
-	      {
-		mDurationUs = 0;
-		for (size_t i = 0; i < mMpd->size(); ++i) 
-		  {
-		    sp<AMessage> itemMeta;
-		    CHECK(mMpd->itemAt(i, NULL /* uri */, &itemMeta));
-		    
-		    int64_t itemDurationUs;
-		    CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
-
-		    mDurationUs += itemDurationUs;
-		  }
+		sp<AMessage> itemMeta;
+		CHECK(mMpd->itemAt(i, NULL /* uri */, &itemMeta));
 		
-		mDurationFixed = mMpd->isComplete();
+		int64_t itemDurationUs;
+		CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
+		
+		mDurationUs += itemDurationUs;
 	      }
+	    
+	    mDurationFixed = mMpd->isComplete();
 	  }
-
-	mLastMpdFetchTimeUs = ALooper::GetNowUs();
       }
+      
+      mLastMpdFetchTimeUs = ALooper::GetNowUs();
+    }
 
     int32_t firstSeqNumberInMpd;
     if (mMpd->meta() == NULL || 

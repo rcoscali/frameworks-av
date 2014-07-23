@@ -15,6 +15,7 @@ LOCAL_SRC_FILES:=                       \
         mp4/MP4Source.cpp
 
 LOCAL_C_INCLUDES := \
+	$(TOP)/external/stlport/stlport                               \
 	$(TOP)/frameworks/av/media/libstagefright/httplive            \
 	$(TOP)/frameworks/av/media/libstagefright/dash                \
 	$(TOP)/frameworks/av/media/libstagefright/include             \
