@@ -382,7 +382,7 @@ namespace android {
 
     int32_t firstSeqNumberInMpd;
     if (mMpd->meta() == NULL || !mMpd->meta()->findInt32(
-								   "media-sequence", &firstSeqNumberInMpd)) {
+							 "media-sequence", &firstSeqNumberInMpd)) {
       firstSeqNumberInMpd = 0;
     }
 
@@ -397,7 +397,7 @@ namespace android {
 	 index < seqNumber - firstSeqNumberInMpd; ++index) {
       sp<AMessage> itemMeta;
       CHECK(mMpd->itemAt(
-			      index, NULL /* uri */, &itemMeta));
+			 index, NULL /* uri */, &itemMeta));
 
       int64_t itemDurationUs;
       CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
@@ -584,20 +584,19 @@ namespace android {
 	  }
       }
       
-      mLastMpdFetchTimeUs = ALooper::GetNowUs();
-    }
-
-    int32_t firstSeqNumberInMpd;
+    mLastMpdFetchTimeUs = ALooper::GetNowUs();
+  
+    int firstSeqNumberInMpd;
     if (mMpd->meta() == NULL || 
 	!mMpd->meta()->findInt32("media-sequence", &firstSeqNumberInMpd)) 
       {
 	firstSeqNumberInMpd = 0;
       }
-
+    
     bool seekDiscontinuity = false;
     bool explicitDiscontinuity = false;
     bool bandwidthChanged = false;
-
+    
     if (mSeekTimeUs >= 0) 
       {
 	if (mMpd->isComplete() || mMpd->isEvent()) 
@@ -611,26 +610,26 @@ namespace android {
 		
 		int64_t itemDurationUs;
 		CHECK(itemMeta->findInt64("durationUs", &itemDurationUs));
-
+		
 		if (mSeekTimeUs < segmentStartUs + itemDurationUs) 
 		  {
 		    break;
 		  }
-
+		
 		segmentStartUs += itemDurationUs;
 		++index;
 	      }
-
+	    
 	    if (index < mMpd->size()) 
 	      {
 		int32_t newSeqNumber = firstSeqNumberInMpd + index;
-
+		
 		ALOGI("seeking to seq no %d", newSeqNumber);
-
+		
 		mSeqNumber = newSeqNumber;
 		
 		mDataSource->reset();
-
+		
 		// reseting the data source will have had the
 		// side effect of discarding any previously queued
 		// bandwidth change discontinuity.
@@ -739,7 +738,7 @@ namespace android {
       }
 
     ALOGV("fetching segment %d from (%d .. %d)",
-          mSeqNumber, firstSeqNumberInMpd, lastSeqNumberInMpd);
+	  mSeqNumber, firstSeqNumberInMpd, lastSeqNumberInMpd);
 
     sp<ABuffer> buffer;
     status_t err = fetchFile(uri.c_str(), &buffer, range_offset, range_length);
@@ -882,10 +881,10 @@ namespace android {
 	      }
 
 	    mInPreparationPhase = false;
-      }
+	  }
 
-      postMonitorQueue(1000000ll);
-    }
+	postMonitorQueue(1000000ll);
+      }
   }
 
   /*
