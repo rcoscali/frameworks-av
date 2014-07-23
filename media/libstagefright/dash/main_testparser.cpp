@@ -50,7 +50,7 @@ main(int argc, char *argv[])
       exit(-1);
     }
   
-  ALOGV("File size = %ld\n", stbuf.st_size);
+  ALOGV("File size = %lld\n", stbuf.st_size);
   buffer = (char *)malloc(stbuf.st_size+1);
 
   FILE *fp = fopen(argv[1], "r");
@@ -66,7 +66,7 @@ main(int argc, char *argv[])
       exit(-1);
     }
 
-  ALOGV("Got %u bytes. Parsing ...", bytes);
+  ALOGV("Got %u bytes. Parsing ...\n", bytes);
   MPDParser mpdParser(furi.c_str(), buffer, bytes);
   ALOGV("Parsed!\n");
 }

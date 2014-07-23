@@ -328,7 +328,7 @@ namespace android
     public:
       MPDUrlType()
 	: mSourceUrl(AString("")),
-	  mRange() 
+	  mRange(new MPDRange()) 
       {};
       MPDUrlType(const char *sourceUrl, MPDRange* range)
 	: mSourceUrl(sourceUrl),
@@ -488,7 +488,7 @@ namespace android
     class MPDSegmentTemplateNode : public RefBase {
     public:
       MPDSegmentTemplateNode()
-	: mMultSegBaseType(),
+	: mMultSegBaseType(new MPDMultSegmentBaseType()),
 	  mMedia(AString("")),
 	  mIndex(AString("")),
 	  mInitialization(AString("")),

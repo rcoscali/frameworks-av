@@ -52,7 +52,7 @@ namespace android {
   /*
    * Namespace & Content (text data...)
    */
-  static AString &   mpdparser_get_xml_node_namespace  (xmlNode *, const char *);
+  static AString *   mpdparser_get_xml_node_namespace  (xmlNode *, const char *);
   static void        mpdparser_get_xml_node_content    (xmlNode *, char **);
 
   /*
@@ -246,7 +246,7 @@ namespace android {
       {
 	// "url" is already an absolute URL, ignore base URL.
 	out->setTo(url);
-	ALOGV("base:'%s', url:'%s' => '%s'", baseUrl, url, out->c_str());
+	ALOGV("base:'%s', url:'%s' => '%s'\n", baseUrl, url, out->c_str());
 	return true;
       }
     
@@ -290,23 +290,22 @@ namespace android {
 	  }
       }
     
-    ALOGV("base:'%s', url:'%s' => '%s'", baseUrl, url, out->c_str());    
+    ALOGV("base:'%s', url:'%s' => '%s'\n", baseUrl, url, out->c_str());    
     return true;
   }
 
-  static AString &
+  static AString *
   mpdparser_get_xml_node_namespace (xmlNode *a_node, const char *prefix)
   {
     xmlNs *curr_ns;
     char *namspc = (char *)NULL;
-    AString ret;
 
     if (prefix == (char *)NULL) 
       {
 	/* return the default namespace */
 	namspc = xmlMemStrdup ((const char *) a_node->ns->href);
 	if (namspc) 
-	  ALOGV (" - default namespace: %s", namspc);
+	  ALOGV (" - default namespace: %s\n", namspc);
       } 
     else 
       {
@@ -317,13 +316,12 @@ namespace android {
 	      {
 		namspc = xmlMemStrdup ((const char *) curr_ns->href);
 		if (namspc)
-		  ALOGV (" - %s namespace: %s", curr_ns->prefix, curr_ns->href);
+		  ALOGV (" - %s namespace: %s\n", curr_ns->prefix, curr_ns->href);
 	      }
 	  }
       }
-    
-    ASSIGN_ASTRING_WITH_POSSIBLE_NULL(ret, namspc);
-    return ret;
+
+    return (new AString(namspc != (char *)NULL ? namspc : ""));
   }
 
   /*
@@ -359,7 +357,7 @@ namespace android {
     if (prop_string) 
       {
 	str = (char *) prop_string;
-	ALOGV ("dateTime: %s, len %d", str, xmlStrlen (prop_string));
+	ALOGV ("dateTime: %s, len %d\n", str, xmlStrlen (prop_string));
 
 	/* parse year */
 	ret = sscanf (str, "%hu", &year);
@@ -367,7 +365,7 @@ namespace android {
 	  goto error;
 	pos = strcspn (str, "-");
 	str += (pos + 1);
-	ALOGV (" - year %d", year);
+	ALOGV (" - year %d\n", year);
 
 	/* parse month */
 	ret = sscanf (str, "%c", &month);
@@ -375,7 +373,7 @@ namespace android {
 	  goto error;
 	pos = strcspn (str, "-");
 	str += (pos + 1);
-	ALOGV (" - month %d", month);
+	ALOGV (" - month %d\n", month);
 
 	/* parse day */
 	ret = sscanf (str, "%c", &day);
@@ -383,7 +381,7 @@ namespace android {
 	  goto error;
 	pos = strcspn (str, "T");
 	str += (pos + 1);
-	ALOGV (" - day %d", day);
+	ALOGV (" - day %d\n", day);
 
 	/* parse hour */
 	ret = sscanf (str, "%c", &hour);
@@ -391,7 +389,7 @@ namespace android {
 	  goto error;
 	pos = strcspn (str, ":");
 	str += (pos + 1);
-	ALOGV (" - hour %d", hour);
+	ALOGV (" - hour %d\n", hour);
 	
 	/* parse minute */
 	ret = sscanf (str, "%c", &minute);
@@ -399,15 +397,15 @@ namespace android {
 	  goto error;
 	pos = strcspn (str, ":");
 	str += (pos + 1);
-	ALOGV (" - minute %d", minute);
+	ALOGV (" - minute %d\n", minute);
 	
 	/* parse second */
 	ret = sscanf (str, "%c", &second);
 	if (ret != 1)
 	  goto error;
-	ALOGV (" - second %d", second);
+	ALOGV (" - second %d\n", second);
       
-	ALOGV (" - %s: %4d/%02d/%02d %02d:%02d:%02d", 
+	ALOGV (" - %s: %4d/%02d/%02d %02d:%02d:%02d\n", 
 	       property_name,
 	       year, month, day, hour, minute, second);
       
@@ -420,7 +418,7 @@ namespace android {
     
   error:
     xmlFree (prop_string);
-    ALOGW ("failed to parse property %s from xml string %s", 
+    ALOGW ("failed to parse property %s from xml string %s\n", 
 	   property_name, prop_string);
     return exists;
   }
@@ -486,17 +484,17 @@ namespace android {
       {
 	len = xmlStrlen (prop_string);
 	str = (char *) prop_string;
-	ALOGV ("duration: %s, len %d", str, len);
+	ALOGV ("duration: %s, len %d\n", str, len);
 	/* read "-" for sign, if present */
 	pos = strcspn (str, "-");
 	if (pos < len)             /* found "-" */
 	  {
 	    if (pos != 0) 
 	      {
-		ALOGW ("sign \"-\" non at the beginning of the string");
+		ALOGW ("sign \"-\" non at the beginning of the string\n");
 		goto error;
 	      }
-	    ALOGV ("found - sign at the beginning");
+	    ALOGV ("found - sign at the beginning\n");
 	    sign = -1;
 	    str++;
 	    len--;
@@ -505,7 +503,7 @@ namespace android {
 	pos = strcspn (str, "P");
 	if (pos != 0) 
 	  {
-	    ALOGW ("P not found at the beginning of the string!");
+	    ALOGW ("P not found at the beginning of the string!\n");
 	    goto error;
 	  }
 	str++;
@@ -519,12 +517,12 @@ namespace android {
 	    /* read years, months, days */
 	    do 
 	      {
-		ALOGV ("parsing substring %s", str);
+		ALOGV ("parsing substring %s\n", str);
 		pos = strcspn (str, "YMD");
 		ret = sscanf (str, "%d", &read);
 		if (ret != 1) 
 		  {
-		    ALOGW ("can not read integer value from string %s!", str);
+		    ALOGW ("can not read integer value from string %s!\n", str);
 		    goto error;
 		  }
 		switch (str[pos]) 
@@ -539,17 +537,17 @@ namespace android {
 		    days = read;
 		    break;
 		  default:
-		    ALOGW ("unexpected char %c!", str[pos]);
+		    ALOGW ("unexpected char %c!\n", str[pos]);
 		    goto error;
 		    break;
 		  }
-		ALOGV ("read number %d type %c", read, str[pos]);
+		ALOGV ("read number %d type %c\n", read, str[pos]);
 		str += (pos + 1);
 		posT -= (pos + 1);
 	      } 
 	    while (posT > 0);
 
-	    ALOGV ("Y:M:D=%d:%d:%d", years, months, days);
+	    ALOGV ("Y:M:D=%d:%d:%d\n", years, months, days);
 	  }
 	/* read "T" for time (if present) */
 	/* here T is at pos == 0 */
@@ -562,12 +560,12 @@ namespace android {
 	    /* read hours, minutes, seconds, cents of second */
 	    do 
 	      {
-		ALOGV ("parsing substring %s", str);
+		ALOGV ("parsing substring %s\n", str);
 		pos = strcspn (str, "HMS,.");
 		ret = sscanf (str, "%d", &read);
 		if (ret != 1) 
 		  {
-		    ALOGW ("can not read integer value from string %s!", str);
+		    ALOGW ("can not read integer value from string %s!\n", str);
 		    goto error;
 		  }
 		switch (str[pos]) 
@@ -583,7 +581,7 @@ namespace android {
 		      {
 			/* we have read the decimal part of the seconds */
 			decimals = mpdparser_convert_to_millisecs (read, pos);
-			ALOGV ("decimal number %d (%d digits) -> %d ms", read, pos,
+			ALOGV ("decimal number %d (%d digits) -> %d ms\n", read, pos,
 			       decimals);
 		      } 
 		    else 
@@ -600,17 +598,17 @@ namespace android {
 		    break;
 
 		  default:
-		    ALOGV ("unexpected char %c!", str[pos]);
+		    ALOGV ("unexpected char %c!\n", str[pos]);
 		    goto error;
 		    break;
 		  }
-		ALOGV ("read number %d type %c", read, str[pos]);
+		ALOGV ("read number %d type %c\n", read, str[pos]);
 		str += pos + 1;
 		len -= (pos + 1);
 	      } 
 	    while (len > 0);
 
-	    ALOGV ("H:M:S.MS=%d:%d:%d.%03d", hours, minutes, seconds, decimals);
+	    ALOGV ("H:M:S.MS=%d:%d:%d.%03d\n", hours, minutes, seconds, decimals);
 	  }
 
 	xmlFree (prop_string);
@@ -618,7 +616,7 @@ namespace android {
 	*property_value =
 	  sign * ((((((int64_t) years * 365 + months * 30 + days) * 24 +
 		     hours) * 60 + minutes) * 60 + seconds) * 1000 + decimals);
-	ALOGV (" - %s: %Ld", property_name, *property_value);
+	ALOGV (" - %s: %Ld\n", property_name, *property_value);
       }
 
     if (!exists) 
@@ -646,7 +644,7 @@ namespace android {
 	if (property_value)
 	  *property_value = AString((char *) prop_string);
 	exists = TRUE;
-	ALOGV (" - %s: %s", property_name, prop_string);
+	ALOGV (" - %s: %s\n", property_name, prop_string);
       }
     
     return exists;
@@ -669,17 +667,17 @@ namespace android {
 	  {
 	    exists = TRUE;
 	    *property_value = FALSE;
-	    ALOGV (" - %s: false", property_name);
+	    ALOGV (" - %s: false\n", property_name);
 	  } 
 	else if (xmlStrcmp (prop_string, (xmlChar *) "true") == 0) 
 	  {
 	    exists = TRUE;
 	    *property_value = TRUE;
-	    ALOGV (" - %s: true", property_name);
+	    ALOGV (" - %s: true\n", property_name);
 	  } 
 	else 
 	  {
-	    ALOGW ("failed to parse boolean property %s from xml string %s",
+	    ALOGW ("failed to parse boolean property %s from xml string %s\n",
 		   property_name, prop_string);
 	  }
 	xmlFree (prop_string);
@@ -715,7 +713,7 @@ namespace android {
       } 
     else 
       {
-	ALOGW ("Allocation of URLType node failed!");
+	ALOGW ("Allocation of URLType node failed!\n");
       }
 
     return clone;
@@ -737,10 +735,10 @@ namespace android {
 	if (sscanf ((char *) prop_string, "%u", property_value)) 
 	  {
 	    exists = TRUE;
-	    ALOGV (" - %s: %u", property_name, *property_value);
+	    ALOGV (" - %s: %u\n", property_name, *property_value);
 	  }
 	else
-	  ALOGW("failed to parse unsigned integer property %s from "
+	  ALOGW("failed to parse unsigned integer property %s from \n"
 		"xml string %s", property_name, prop_string);
 	
 	xmlFree (prop_string);
@@ -764,13 +762,13 @@ namespace android {
       {
 	len = xmlStrlen (prop_string);
 	str = (char *) prop_string;
-	ALOGV ("range: %s, len %d", str, len);
+	ALOGV ("range: %s, len %d\n", str, len);
 
 	/* read "-" */
 	pos = strcspn (str, "-");
 	if (pos >= len) 
 	  {
-	    ALOGV ("pos %d >= len %d", pos, len);
+	    ALOGV ("pos %d >= len %d\n", pos, len);
 	    goto error;
 	  }
 
@@ -794,19 +792,19 @@ namespace android {
 	*property_value = new MPDParser::MPDRange(first_byte_pos, last_byte_pos);
 	if (*property_value == NULL) 
 	  {
-	    ALOGE ("Allocation of GstRange failed!");
+	    ALOGE ("Allocation of GstRange failed!\n");
 	    goto error;
 	  }
 	exists = TRUE;
 	xmlFree (prop_string);
-	ALOGV (" - %s: %Ld-%Ld", property_name, first_byte_pos, last_byte_pos);
+	ALOGV (" - %s: %Ld-%Ld\n", property_name, first_byte_pos, last_byte_pos);
       }
 
     return exists;
 
   error:
     xmlFree (prop_string);
-    ALOGW ("failed to parse property %s from xml string %s", 
+    ALOGW ("failed to parse property %s from xml string %s\n", 
 	   property_name, prop_string);
     return FALSE;
   }
@@ -820,11 +818,11 @@ namespace android {
     *pointer = new_url_type = new MPDParser::MPDUrlType();
     if (new_url_type == NULL) 
       {
-	ALOGW ("Allocation of URLType node failed!");
+	ALOGW ("Allocation of URLType node failed!\n");
 	return;
       }
 
-    ALOGV ("attributes of URLType node:");
+    ALOGV ("attributes of URLType node:\n");
 
     mpdparser_get_xml_prop_string (a_node, "sourceURL", &(new_url_type->mSourceUrl));
     mpdparser_get_xml_prop_range (a_node, "range", &new_url_type->mRange);
@@ -863,7 +861,7 @@ namespace android {
     /* We must retrieve each value first to see if it exists.  If it does not
      * exist, we do not want to overwrite an inherited value 
      */
-    ALOGV ("attributes of SegmentBaseType extension:");
+    ALOGV ("attributes of SegmentBaseType extension:\n");
 
     if (mpdparser_get_xml_prop_uint (a_node, "timescale", 0, &intval)) 
       {
@@ -922,7 +920,7 @@ namespace android {
 	    clone->mIndexRange = mpdparser_clone_range (seg_url->mIndexRange);
 	  } 
 	else 
-	  ALOGW ("Allocation of SegmentURL node failed!");
+	  ALOGW ("Allocation of SegmentURL node failed!\n");
       }
     
     return *clone;
@@ -949,7 +947,7 @@ namespace android {
 	  }
       } 
     else
-      ALOGW ("Allocation of SegmentTimeline node failed!");
+      ALOGW ("Allocation of SegmentTimeline node failed!\n");
 
     return clone;
   }
@@ -968,10 +966,10 @@ namespace android {
 	if (sscanf ((char *) prop_string, "%llu", property_value)) 
 	  {
 	    exists = TRUE;
-	    ALOGV (" - %s: %llu", property_name, *property_value);
+	    ALOGV (" - %s: %llu\n", property_name, *property_value);
 	  } 
 	else 
-	  ALOGW("failed to parse unsigned integer property %s from xml string %s",
+	  ALOGW("failed to parse unsigned integer property %s from xml string %s\n",
 		property_name, prop_string);
 	xmlFree (prop_string);
       }
@@ -985,7 +983,7 @@ namespace android {
     uint64_t t, d;
     uint32_t r;
 
-    ALOGV ("attributes of S node:");
+    ALOGV ("attributes of S node:\n");
     mpdparser_get_xml_prop_uint64 (a_node, "t", 0, &t);
     mpdparser_get_xml_prop_uint64 (a_node, "d", 0, &d);
     mpdparser_get_xml_prop_uint (a_node, "r", 0, &r);
@@ -994,7 +992,7 @@ namespace android {
     if (new_s_node != (MPDParser::MPD_SNode *)NULL) 
       (*list)->push_back(*new_s_node);
     else
-      ALOGW ("Allocation of S node failed!");
+      ALOGW ("Allocation of S node failed!\n");
   }
 
   static void
@@ -1018,7 +1016,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of SegmentTimeline node failed!");
+      ALOGW ("Allocation of SegmentTimeline node failed!\n");
   }
 
   static void
@@ -1042,7 +1040,7 @@ namespace android {
 	    mult_seg_base_type->mBitstreamSwitching = mpdparser_clone_URL (parent->mBitstreamSwitching);
 	  }
 	
-	ALOGV ("attributes of MultipleSegmentBaseType extension:");
+	ALOGV ("attributes of MultipleSegmentBaseType extension:\n");
 
 	if (mpdparser_get_xml_prop_uint (a_node, "duration", 0, &intval)) 
 	  {
@@ -1053,7 +1051,7 @@ namespace android {
 	    mult_seg_base_type->mStartNumber = intval;
 	  }
 	
-	ALOGV ("extension of MultipleSegmentBaseType extension:");
+	ALOGV ("extension of MultipleSegmentBaseType extension:\n");
 	mpdparser_parse_seg_base_type_ext (&mult_seg_base_type->mSegmentBaseType, a_node, 
 					   (parent ? parent->mSegmentBaseType : NULL));
 	
@@ -1080,7 +1078,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of MultipleSegmentBaseType node failed!");
+      ALOGW ("Allocation of MultipleSegmentBaseType node failed!\n");
 
     return;
   }
@@ -1095,14 +1093,14 @@ namespace android {
       {
 	(*list)->push_back(*new_segment_url);
 
-	ALOGV ("attributes of SegmentURL node:");
+	ALOGV ("attributes of SegmentURL node:\n");
 	mpdparser_get_xml_prop_string (a_node, "media", &(new_segment_url->mMedia));
 	mpdparser_get_xml_prop_range (a_node, "mediaRange", &(new_segment_url->mMediaRange));
 	mpdparser_get_xml_prop_string (a_node, "index", &(new_segment_url->mIndex));
 	mpdparser_get_xml_prop_range (a_node, "indexRange", &new_segment_url->mIndexRange);
       }
     else
-      ALOGW ("Allocation of SegmentURL node failed!");
+      ALOGW ("Allocation of SegmentURL node failed!\n");
   }
 
   static void
@@ -1130,7 +1128,7 @@ namespace android {
 	      }
 	  }
 	
-	ALOGV ("extension of SegmentList node:");
+	ALOGV ("extension of SegmentList node:\n");
 	mpdparser_parse_mult_seg_base_type_ext(&new_segment_list->mMultSegBaseType, a_node,
 					       (parent ? parent->mMultSegBaseType : NULL));
 	
@@ -1147,7 +1145,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of SegmentList node failed!");
+      ALOGW ("Allocation of SegmentList node failed!\n");
   }
 
   static void
@@ -1170,13 +1168,13 @@ namespace android {
 	    new_segment_template->mBitstreamSwitching = AString(xmlMemStrdup (parent->mBitstreamSwitching.c_str()));
 	  }
 
-	ALOGV ("extension of SegmentTemplate node:");
+	ALOGV ("extension of SegmentTemplate node:\n");
 	mpdparser_parse_mult_seg_base_type_ext (&new_segment_template->mMultSegBaseType, a_node, 
 						(parent != (MPDParser::MPDSegmentTemplateNode *)NULL ? 
 						 parent->mMultSegBaseType : 
 						 (MPDParser::MPDMultSegmentBaseType *)NULL));
 
-	ALOGV ("attributes of SegmentTemplate node:");
+	ALOGV ("attributes of SegmentTemplate node:\n");
 	if (mpdparser_get_xml_prop_string (a_node, "media", &strval))
 	  new_segment_template->mMedia = AString(strval);
 
@@ -1190,7 +1188,7 @@ namespace android {
 	  new_segment_template->mBitstreamSwitching = AString(strval);
       }
     else
-      ALOGW ("Allocation of SegmentTemplate node failed!");
+      ALOGW ("Allocation of SegmentTemplate node failed!\n");
   }
 
   static vector<uint32_t>
@@ -1210,13 +1208,13 @@ namespace android {
 	    if (sscanf ((char *) str_vector, "%u", &prop_uint) > 0)
 	      prop_uints.push_back(prop_uint);
 	    else
-	      ALOGW("Failed to parse uint property %s from xml string %s", property_name, str_vector);
+	      ALOGW("Failed to parse uint property %s from xml string %s\n", property_name, str_vector);
 	  }
 
 	*value_size = prop_uints.size();
       }
     else
-      ALOGW ("Scan of uint vector property failed!");
+      ALOGW ("Scan of uint vector property failed!\n");
 
     return prop_uints;
   }
@@ -1231,11 +1229,11 @@ namespace android {
       {
 	list->push_back(*new_subset);
 
-	ALOGV ("attributes of Subset node:");
+	ALOGV ("attributes of Subset node:\n");
 	new_subset->mContains = mpdparser_get_xml_prop_uint_vector_type (a_node, "contains", &new_subset->mSize);
       }
     else
-      ALOGW ("Allocation of Subset node failed!");
+      ALOGW ("Allocation of Subset node failed!\n");
   }
 
   static bool
@@ -1252,13 +1250,13 @@ namespace android {
       {
 	len = xmlStrlen (prop_string);
 	str = (char *) prop_string;
-	ALOGV ("ratio: %s, len %d", str, len);
+	ALOGV ("ratio: %s, len %d\n", str, len);
 
 	/* read ":" */
 	pos = strcspn (str, ":");
 	if (pos >= len) 
 	  {
-	    ALOGV ("pos %d >= len %d", pos, len);
+	    ALOGV ("pos %d >= len %d\n", pos, len);
 	    goto error;
 	  }
 	/* read num */
@@ -1280,21 +1278,21 @@ namespace android {
 	*property_value = new MPDParser::MPDRatio();
 	if (*property_value == NULL) 
 	  {
-	    ALOGW ("Allocation of GstRatio failed!");
+	    ALOGW ("Allocation of GstRatio failed!\n");
 	    goto error;
 	  }
 	exists = TRUE;
 	(*property_value)->mNum = num;
 	(*property_value)->mDen = den;
 	xmlFree (prop_string);
-	ALOGV (" - %s: %u:%u", property_name, num, den);
+	ALOGV (" - %s: %u:%u\n", property_name, num, den);
       }
 
     goto terminate;
     
   error:
     xmlFree (prop_string);
-    ALOGW ("failed to parse property %s from xml string %s", property_name, prop_string);
+    ALOGW ("failed to parse property %s from xml string %s\n", property_name, prop_string);
 
   terminate:
     return exists;
@@ -1314,7 +1312,7 @@ namespace android {
       {
 	len = xmlStrlen (prop_string);
 	str = (char *) prop_string;
-	ALOGV ("framerate: %s, len %d", str, len);
+	ALOGV ("framerate: %s, len %d\n", str, len);
 
 	/* read "/" if available */
 	pos = strcspn (str, "/");
@@ -1335,7 +1333,7 @@ namespace android {
 	*property_value = new MPDParser::MPDFrameRate();
 	if (*property_value == (MPDParser::MPDFrameRate *)NULL) 
 	  {
-	    ALOGW ("Allocation of GstFrameRate failed!");
+	    ALOGW ("Allocation of GstFrameRate failed!\n");
 	    goto error;
 	  }
 	exists = TRUE;
@@ -1343,16 +1341,16 @@ namespace android {
 	(*property_value)->mDen = den;
 	xmlFree (prop_string);
 	if (den == 1)
-	  ALOGV (" - %s: %u", property_name, num);
+	  ALOGV (" - %s: %u\n", property_name, num);
 	else
-	  ALOGV (" - %s: %u/%u", property_name, num, den);
+	  ALOGV (" - %s: %u/%u\n", property_name, num, den);
       }
     
     goto terminate;
 
   error:
     xmlFree (prop_string);
-    ALOGW ("failed to parse property %s from xml string %s", property_name, prop_string);
+    ALOGW ("failed to parse property %s from xml string %s\n", property_name, prop_string);
   terminate:
     return exists;
   }
@@ -1370,7 +1368,7 @@ namespace android {
     if (prop_string) 
       {
 	str = (char *) prop_string;
-	ALOGV ("conditional uint: %s", str);
+	ALOGV ("conditional uint: %s\n", str);
 
 	if (strcmp (str, "false") == 0) 
 	  {
@@ -1397,11 +1395,11 @@ namespace android {
 	    (*property_value)->mFlag = flag;
 	    (*property_value)->mValue = val;
 	    xmlFree (prop_string);
-	    ALOGV (" - %s: flag=%s val=%u", property_name, flag ? "true" : "false", val);
+	    ALOGV (" - %s: flag=%s val=%u\n", property_name, flag ? "true" : "false", val);
 	  }
 	else
 	  {
-	    ALOGW ("Allocation of GstConditionalUintType failed!");
+	    ALOGW ("Allocation of GstConditionalUintType failed!\n");
 	    goto error;
 	  }
 
@@ -1410,7 +1408,7 @@ namespace android {
 
   error:
     xmlFree (prop_string);
-    ALOGW ("failed to parse property %s from xml string %s", property_name, prop_string);
+    ALOGW ("failed to parse property %s from xml string %s\n", property_name, prop_string);
     
   terminate:
     return exists;
@@ -1431,10 +1429,10 @@ namespace android {
 	  {
 	    exists = TRUE;
 	    *property_value = (MPDParser::MPDSapType) prop_SAP_type;
-	    ALOGV (" - %s: %u", property_name, prop_SAP_type);
+	    ALOGV (" - %s: %u\n", property_name, prop_SAP_type);
 	  } 
       else
-	ALOGW ("failed to parse unsigned integer property %s from xml string %s", property_name, prop_string);
+	ALOGW ("failed to parse unsigned integer property %s from xml string %s\n", property_name, prop_string);
       }
 
     xmlFree (prop_string);
@@ -1453,10 +1451,10 @@ namespace android {
 	if (sscanf ((char *) prop_string, "%lf", property_value)) 
 	  {
 	    exists = TRUE;
-	    ALOGV (" - %s: %lf", property_name, *property_value);
+	    ALOGV (" - %s: %lf\n", property_name, *property_value);
 	  } 
 	else
-	  ALOGW ("failed to parse double property %s from xml string %s", property_name, prop_string);
+	  ALOGW ("failed to parse double property %s from xml string %s\n", property_name, prop_string);
 
 	xmlFree (prop_string);
       }
@@ -1472,14 +1470,14 @@ namespace android {
     new_descriptor = new MPDParser::MPDDescriptorType();
     if (new_descriptor != (MPDParser::MPDDescriptorType *)NULL) 
       {
-	ALOGW ("Allocation of DescriptorType node failed!");
-	return;
-      }
-    list->push_back(*new_descriptor);
+	list->push_back(*new_descriptor);
 
-    ALOGV ("attributes of %s node:", a_node->name);
-    mpdparser_get_xml_prop_string (a_node, "schemeIdUri", &new_descriptor->mSchemeIdUri);
-    mpdparser_get_xml_prop_string (a_node, "value",       &new_descriptor->mValue);
+	ALOGV ("attributes of %s node:\n", a_node->name);
+	mpdparser_get_xml_prop_string (a_node, "schemeIdUri", &new_descriptor->mSchemeIdUri);
+	mpdparser_get_xml_prop_string (a_node, "value",       &new_descriptor->mValue);
+      }
+    else
+      ALOGW ("Allocation of DescriptorType node failed!\n");
   }
 
   static void
@@ -1489,7 +1487,7 @@ namespace android {
     
     ref = MPDParser::MPDRepresentationBaseType();
 
-    ALOGV ("attributes of RepresentationBaseType extension:");
+    ALOGV ("attributes of RepresentationBaseType extension:\n");
     mpdparser_get_xml_prop_string    (a_node, "profiles",                &(ref.mProfiles));
     mpdparser_get_xml_prop_uint      (a_node, "width",            0,     &ref.mWidth);
     mpdparser_get_xml_prop_uint      (a_node, "height",           0,     &ref.mHeight);
@@ -1536,7 +1534,7 @@ namespace android {
       return;
     
     *content = (char *) node_content;
-    ALOGV (" - %s: %s", a_node->name, *content);
+    ALOGV (" - %s: %s\n", a_node->name, *content);
   }
   
   static void
@@ -1550,16 +1548,16 @@ namespace android {
       {
 	list->push_back(*new_base_url);
 
-	ALOGV ("content of BaseUrl node:");
+	ALOGV ("content of BaseUrl node:\n");
 	mpdparser_get_xml_node_content (a_node, &str);
 	ASSIGN_ASTRING_WITH_POSSIBLE_NULL(new_base_url->mBaseUrl, str);
 
-	ALOGV ("attributes of BaseUrl node:");
+	ALOGV ("attributes of BaseUrl node:\n");
 	mpdparser_get_xml_prop_string (a_node, "serviceLocation", &new_base_url->mServiceLocation);
 	mpdparser_get_xml_prop_string (a_node, "byteRange", &new_base_url->mByteRange);
       }
     else
-      ALOGW ("Allocation of BaseUrl node failed!");    
+      ALOGW ("Allocation of BaseUrl node failed!\n");    
   }
 
   static void
@@ -1573,7 +1571,7 @@ namespace android {
       {
 	list->push_back(*new_content_component);
 
-	ALOGV ("attributes of ContentComponent node:");
+	ALOGV ("attributes of ContentComponent node:\n");
 	mpdparser_get_xml_prop_uint (a_node, "id", 0, &new_content_component->mId);
 	mpdparser_get_xml_prop_string (a_node, "lang", (AString * const&)&(new_content_component->mLang));
 	mpdparser_get_xml_prop_string (a_node, "contentType", (AString * const&)&(new_content_component->mContentType));
@@ -1600,7 +1598,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of ContentComponent node failed!");
+      ALOGW ("Allocation of ContentComponent node failed!\n");
   }
 
   static vector<AString>
@@ -1612,27 +1610,27 @@ namespace android {
     prop_string = xmlGetProp (a_node, (const xmlChar *)property_name);
     if (prop_string) 
       {
-	ALOGV (" - %s:", property_name);
+	ALOGV (" - %s:\n", property_name);
 	char *str_vector = (char *)NULL;
 	while((str_vector = strtok((char *) prop_string, " ")) != (char *)NULL)
 	  {
 	    AString a_str;
 	    prop_string = (xmlChar *)NULL;
 	    ASSIGN_ASTRING_WITH_POSSIBLE_NULL(a_str, str_vector);
-	    ALOGV ("    %s", a_str.c_str());
+	    ALOGV ("    %s\n", a_str.c_str());
 	    property_value.push_back(a_str);
 	  }
-	ALOGV (" - %s size: %d", property_name, property_value.size());
+	ALOGV (" - %s size: %d\n", property_name, property_value.size());
 	if (property_size)
 	  {
 	    *property_size = property_value.size();
-	    ALOGV ("   sent back to caller ...");
+	    ALOGV ("   sent back to caller ...\n");
 	  }
 
 	xmlFree (prop_string);
       }
     else
-      ALOGW(" - Empty vector for property %s", property_name);
+      ALOGW(" - Empty vector for property %s\n", property_name);
 
     return property_value;
   }
@@ -1647,7 +1645,7 @@ namespace android {
       {
 	list->push_back(*new_subrep);
 	
-	ALOGV ("attributes of SubRepresentation node:");
+	ALOGV ("attributes of SubRepresentation node:\n");
 	mpdparser_get_xml_prop_uint (a_node, "level", 0, &new_subrep->mLevel);
 	new_subrep->mDependencyLevel = mpdparser_get_xml_prop_uint_vector_type (a_node, "dependencyLevel", &new_subrep->mSize);
 	mpdparser_get_xml_prop_uint (a_node, "bandwidth", 0, &new_subrep->mBandwidth);
@@ -1657,7 +1655,7 @@ namespace android {
 	mpdparser_parse_representation_base_type (*(new_subrep->mRepresentationBase), a_node);
       }
     else
-      ALOGW ("Allocation of SubRepresentation node failed!");
+      ALOGW ("Allocation of SubRepresentation node failed!\n");
   }
 
   static void
@@ -1671,7 +1669,7 @@ namespace android {
       {
 	list->push_back(*new_representation);
 
-	ALOGV ("attributes of Representation node:");
+	ALOGV ("attributes of Representation node:\n");
 	mpdparser_get_xml_prop_string (a_node, "id", &new_representation->mId);
 	mpdparser_get_xml_prop_uint (a_node, "bandwidth", 0, &new_representation->mBandwidth);
 	mpdparser_get_xml_prop_uint (a_node, "qualityRanking", 0, &new_representation->mQualityRanking);
@@ -1704,7 +1702,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of Representation node failed!");
+      ALOGW ("Allocation of Representation node failed!\n");
   }
 
   static void
@@ -1718,7 +1716,7 @@ namespace android {
       {
 	list->push_back(*new_adap_set);
 
-	ALOGV ("attributes of AdaptationSet node:");
+	ALOGV ("attributes of AdaptationSet node:\n");
 
 	mpdparser_get_xml_prop_uint      (a_node, "id",                   0, &new_adap_set->mId);
 	mpdparser_get_xml_prop_uint      (a_node, "group",                0, &new_adap_set->mGroup);
@@ -1788,9 +1786,9 @@ namespace android {
 
 	      }
 	  }
-	
-	ALOGW ("Allocation of AdaptationSet node failed!");
       }
+    else
+      ALOGW ("Allocation of AdaptationSet node failed!\n");
   }
 
   static void
@@ -1806,7 +1804,7 @@ namespace android {
 
 	new_period->mStart = MPDParser::kClockTimeNone;
 	
-	ALOGV ("attributes of Period node:");
+	ALOGV ("attributes of Period node:\n");
 	mpdparser_get_xml_prop_string (a_node, "id", &new_period->mId);
 	mpdparser_get_xml_prop_duration (a_node, "start", -1, &new_period->mStart);
 	mpdparser_get_xml_prop_duration (a_node, "duration", -1, &new_period->mDuration);
@@ -1851,7 +1849,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of Period node failed!");
+      ALOGW ("Allocation of Period node failed!\n");
   }
   
   static bool
@@ -1869,17 +1867,17 @@ namespace android {
 	  {
 	    exists = TRUE;
 	    *property_value = MPDParser::kMpdTypeStatic;
-	    ALOGV (" - %s: static", property_name);
+	    ALOGV (" - %s: static\n", property_name);
 	  } 
 	else if (xmlStrcmp (prop_string, (xmlChar *) "Live") == 0 ||
 		 xmlStrcmp (prop_string, (xmlChar *) "dynamic") == 0) 
 	  {
 	    exists = TRUE;
 	    *property_value = MPDParser::kMpdTypeDynamic;
-	    ALOGV (" - %s: dynamic", property_name);
+	    ALOGV (" - %s: dynamic\n", property_name);
 	  } 
 	else 
-	  ALOGW ("failed to parse MPD type property %s from xml string %s", property_name, prop_string);
+	  ALOGW ("failed to parse MPD type property %s from xml string %s\n", property_name, prop_string);
 
 	xmlFree (prop_string);
       }
@@ -1898,12 +1896,12 @@ namespace android {
       {
 	list->push_back(*new_prog_info);
 
-	ALOGV ("attributes of ProgramInformation node:");
+	ALOGV ("attributes of ProgramInformation node:\n");
 	mpdparser_get_xml_prop_string (a_node, "lang", (AString * const &)&(new_prog_info->mLang));
 	mpdparser_get_xml_prop_string (a_node, "moreInformationURL", (AString * const &)&(new_prog_info->mMoreInformationURL));
 
 	/* explore children nodes */
-	ALOGV ("children of ProgramInformation node:");
+	ALOGV ("children of ProgramInformation node:\n");
 	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
 	  {
 	    if (cur_node->type == XML_ELEMENT_NODE) 
@@ -1930,7 +1928,7 @@ namespace android {
 	  }
       }
     else
-      ALOGW ("Allocation of ProgramInfo node failed!");
+      ALOGW ("Allocation of ProgramInfo node failed!\n");
   }
 
   static void
@@ -1938,7 +1936,7 @@ namespace android {
   {
     char *location;
     
-    ALOGV ("content of Location node:");
+    ALOGV ("content of Location node:\n");
     mpdparser_get_xml_node_content (a_node, &location);
     
     AString locationAstr;
@@ -1956,12 +1954,12 @@ namespace android {
       {
 	list->push_back(*new_metrics_range);
 
-	ALOGV ("attributes of Metrics Range node:");
+	ALOGV ("attributes of Metrics Range node:\n");
 	mpdparser_get_xml_prop_duration (a_node, "starttime", -1, &new_metrics_range->mStarttime);
 	mpdparser_get_xml_prop_duration (a_node, "duration", -1, &new_metrics_range->mDuration);
       }
     else
-      ALOGW ("Allocation of Metrics Range node failed!");
+      ALOGW ("Allocation of Metrics Range node failed!\n");
   }
 
   static void
@@ -1975,11 +1973,11 @@ namespace android {
       {
 	list->push_back(*new_metrics);
 	
-	ALOGV ("attributes of Metrics node:");
+	ALOGV ("attributes of Metrics node:\n");
 	mpdparser_get_xml_prop_string (a_node, "metrics", &new_metrics->mMetrics);
 	
 	/* explore children nodes */
-	ALOGV ("children of Metrics node:");
+	ALOGV ("children of Metrics node:\n");
 	for (cur_node = a_node->children; cur_node; cur_node = cur_node->next) 
 	  {
 	    if (cur_node->type == XML_ELEMENT_NODE) 
@@ -1994,14 +1992,14 @@ namespace android {
 		     * None was implemented because no spec exists in ISO/IEC 23009.
 		     * We could specify something close to CCM for nagra contents
 		     */
-		    ALOGV (" - Reporting node found (But none implemented)");
-		    ALOGV ("   Need a spec !!!");
+		    ALOGV (" - Reporting node found (But none implemented)\n");
+		    ALOGV ("   Need a spec !!!\n");
 		  }
 	      }
 	  }
       }
     else
-      ALOGW ("Allocation of Metrics node failed!");
+      ALOGW ("Allocation of Metrics node failed!\n");
   }
 
   static void
@@ -2013,13 +2011,13 @@ namespace android {
     if (an_mpdNode && *an_mpdNode) delete *an_mpdNode;
     *an_mpdNode = new_mpd = new MPDParser::MPDMpdNode();
 
-    ALOGV ("namespaces of root MPD node:");
+    ALOGV ("namespaces of root MPD node:\n");
 
-    new_mpd->mDefault_namespace = mpdparser_get_xml_node_namespace (a_node, NULL);
-    new_mpd->mNamespace_xsi = mpdparser_get_xml_node_namespace (a_node, "xsi");
-    new_mpd->mNamespace_ext = mpdparser_get_xml_node_namespace (a_node, "ext");
+    new_mpd->mDefault_namespace = *(mpdparser_get_xml_node_namespace (a_node, NULL));
+    new_mpd->mNamespace_xsi = *(mpdparser_get_xml_node_namespace (a_node, "xsi"));
+    new_mpd->mNamespace_ext = *(mpdparser_get_xml_node_namespace (a_node, "ext"));
 
-    ALOGV ("attributes of root MPD node:");
+    ALOGV ("attributes of root MPD node:\n");
     
     mpdparser_get_xml_prop_string (a_node, "schemaLocation", &new_mpd->mSchemaLocation);
     mpdparser_get_xml_prop_string (a_node, "id", &new_mpd->mId);
@@ -2087,7 +2085,7 @@ namespace android {
 	xmlDocPtr doc;
 	xmlNode *root_element = NULL;
 
-	ALOGV ("MPD file fully buffered, start parsing...");
+	ALOGV ("MPD file fully buffered, start parsing...\n");
 
 	/* parse the complete MPD file into a tree (using the libxml2 default parser API) */
 
@@ -2102,7 +2100,7 @@ namespace android {
 
 	if (doc == NULL) 
 	  {
-	    ALOGE ("failed to parse the MPD file");
+	    ALOGE ("failed to parse the MPD file\n");
 	    return BAD_TYPE;
 	  } 
 	else 
@@ -2112,7 +2110,7 @@ namespace android {
 	    if (root_element->type != XML_ELEMENT_NODE ||
 		xmlStrcmp (root_element->name, (xmlChar *) "MPD") != 0)
 	      {
-		ALOGE("can not find the root element MPD, failed to parse the MPD file");
+		ALOGE("can not find the root element MPD, failed to parse the MPD file\n");
 	      }
 	    else 
 	      {
