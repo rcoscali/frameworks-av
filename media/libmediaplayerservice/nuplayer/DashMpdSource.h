@@ -15,19 +15,20 @@
  */
 
 #ifndef DASH_MPD_SOURCE_H_
-
 #define DASH_MPD_SOURCE_H_
 
 #include "NuPlayer.h"
 #include "NuPlayerSource.h"
 
-namespace android {
+namespace android 
+{
 
  public:
   struct FragmentedMP4Parser;
   struct DashSession;
 
-  struct NuPlayer::DashMpdSource : public NuPlayer::Source {
+  struct NuPlayer::DashMpdSource : public NuPlayer::Source 
+  {
     DashMpdSource(
             const sp<AMessage>                  &notify,
             const char                          *url,

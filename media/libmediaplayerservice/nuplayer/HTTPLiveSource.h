@@ -15,7 +15,6 @@
  */
 
 #ifndef HTTP_LIVE_SOURCE_H_
-
 #define HTTP_LIVE_SOURCE_H_
 
 #include "NuPlayer.h"
@@ -23,10 +22,11 @@
 
 namespace android {
 
-struct ATSParser;
-struct LiveSession;
-
-struct NuPlayer::HTTPLiveSource : public NuPlayer::Source {
+  class ATSParser;
+  class LiveSession;
+  
+  class NuPlayer::HTTPLiveSource : public NuPlayer::Source {
+  public:
     HTTPLiveSource(
             const sp<AMessage>                  &notify,
             const char                          *url,
@@ -77,6 +77,6 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(HTTPLiveSource);
 };
 
-}  // namespace android
+};  // namespace android
 
 #endif  // HTTP_LIVE_SOURCE_H_

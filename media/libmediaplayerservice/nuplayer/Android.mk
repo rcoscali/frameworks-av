@@ -1,10 +1,11 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
+#        DashMpdSource.cpp               \
+
 LOCAL_SRC_FILES:=                       \
-        GenericSource.cpp               \
-        DashMpdSource.cpp               \
         HTTPLiveSource.cpp              \
+        GenericSource.cpp               \
         NuPlayer.cpp                    \
         NuPlayerDecoder.cpp             \
         NuPlayerDriver.cpp              \

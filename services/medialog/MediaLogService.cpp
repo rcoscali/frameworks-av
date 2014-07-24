@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "MediaLog"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include <sys/mman.h>
 #include <utils/Log.h>

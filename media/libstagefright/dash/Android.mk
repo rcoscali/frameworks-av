@@ -2,9 +2,11 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:=               \
-        DashDataSource.cpp      \
+#        DashDataSource.cpp      \
         DashSession.cpp         \
+
+
+LOCAL_SRC_FILES:=               \
         MPDParser.cpp
 
 LOCAL_C_INCLUDES:= \

@@ -22,7 +22,7 @@
 
 
 #include "HTTPLiveSource.h"
-#include "DashMpdSource.h"
+//#include "DashMpdSource.h"
 #include "NuPlayerDecoder.h"
 #include "NuPlayerDriver.h"
 #include "NuPlayerRenderer.h"
@@ -205,8 +205,8 @@ void NuPlayer::setDataSourceAsync(
     sp<Source> source;
     if (IsHTTPLiveURL(url)) {
         source = new HTTPLiveSource(notify, url, headers, mUIDValid, mUID);
-    } else if (IsDashURL(url)) {
-        source = new DashMpdSource(notify, url, headers, mUIDValid, mUID);
+	//    } else if (IsDashURL(url)) {
+	//        source = new DashMpdSource(notify, url, headers, mUIDValid, mUID);
     } else if (!strncasecmp(url, "rtsp://", 7)) {
         source = new RTSPSource(notify, url, headers, mUIDValid, mUID);
     } else if ((!strncasecmp(url, "http://", 7)

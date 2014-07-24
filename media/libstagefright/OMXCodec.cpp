@@ -34,7 +34,7 @@
  *
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "OMXCodec"
 #include <utils/Log.h>
 

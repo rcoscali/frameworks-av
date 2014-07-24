@@ -17,8 +17,8 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
-//#define LOG_NDDEBUG 0
+#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
 #define LOG_TAG "TunnelPlayer"
 #include <utils/Log.h>
 #include <utils/threads.h>

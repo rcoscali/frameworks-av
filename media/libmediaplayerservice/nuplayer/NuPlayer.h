@@ -73,7 +73,7 @@ public:
 private:
     struct Decoder;
     struct GenericSource;
-    /*struct HTTPLiveSource;*/
+    struct HTTPLiveSource;
     struct DashMpdSource;
     struct Renderer;
     struct RTSPSource;
@@ -183,6 +183,6 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer);
 };
 
-}  // namespace android
+};  // namespace android
 
 #endif  // NU_PLAYER_H_

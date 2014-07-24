@@ -15,7 +15,6 @@
  */
 
 #ifndef NUPLAYER_SOURCE_H_
-
 #define NUPLAYER_SOURCE_H_
 
 #include "NuPlayer.h"
@@ -48,14 +47,14 @@ struct NuPlayer::Source : public AHandler {
     // events.
     Source(const sp<AMessage> &notify)
         : mNotify(notify) {
-    }
+    };
 
     virtual void prepareAsync() = 0;
 
     virtual void start() = 0;
-    virtual void stop() {}
-    virtual void pause() {}
-    virtual void resume() {}
+    virtual void stop() {};
+    virtual void pause() {};
+    virtual void resume() {};
 
     // Returns OK iff more data was available,
     // an error or ERROR_END_OF_STREAM if not.
@@ -68,15 +67,15 @@ struct NuPlayer::Source : public AHandler {
 
     virtual status_t getDuration(int64_t *durationUs) {
         return INVALID_OPERATION;
-    }
+    };
 
     virtual status_t seekTo(int64_t seekTimeUs) {
         return INVALID_OPERATION;
-    }
+    };
 
     virtual bool isRealTime() const {
         return false;
-    }
+    };
 
 protected:
     virtual ~Source() {}
@@ -97,7 +96,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(Source);
 };
 
-}  // namespace android
+};  // namespace android
 
 #endif  // NUPLAYER_SOURCE_H_
 

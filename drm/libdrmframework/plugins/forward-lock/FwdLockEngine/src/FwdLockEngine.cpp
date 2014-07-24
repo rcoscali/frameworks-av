@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#define DRM_OMA_FL_ENGINE_DEBUG 1
 
 #include "SessionMap.h"
 #include "FwdLockEngine.h"

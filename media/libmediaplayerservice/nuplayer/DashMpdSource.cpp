@@ -18,10 +18,10 @@
 #define LOG_TAG "DashMpdSource"
 #include <utils/Log.h>
 
-#include "DashMpdSource.h"
 #include "FragmentedMP4Parser.h"
 #include "DashDataSource.h"
 #include "DashSession.h"
+#include "DashMpdSource.h"
 
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

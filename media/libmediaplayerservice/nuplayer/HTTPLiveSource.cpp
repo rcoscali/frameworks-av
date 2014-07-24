@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "HTTPLiveSource"
 #include <utils/Log.h>
 
@@ -121,7 +121,7 @@ namespace android
 
     for (int32_t i = 0; i < 50; ++i) 
       {
-        char buffer[android::kTSPacketSize];
+        char buffer[188];
         ssize_t n = source->readAtNonBlocking(mOffset, buffer, sizeof(buffer));
 
         if (n == -EWOULDBLOCK) 
