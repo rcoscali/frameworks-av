@@ -542,8 +542,8 @@ namespace android {
 
       ALOGV("NuPlayerFactory:scoreFactory - Enter\n");
 
-      ALOGD("NuPlayerFactory:scoreFactory - url '%s'\n", url)
-	ALOGD("NuPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+      ALOGD("NuPlayerFactory:scoreFactory - url '%s'\n", url);
+      ALOGD("NuPlayerFactory:scoreFactory - cur score = %f\n", curScore);
 
       if (kOurScore <= curScore)
 	{
