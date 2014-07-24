@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "Drm"
 #include <utils/Log.h>
 
@@ -125,6 +125,14 @@ void Drm::sendEvent(DrmPlugin::EventType eventType, int extra,
  */
 void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
 
+    ALOGV("Drm::findFactoryForScheme - Enter");
+    ALOGV("Drm::findFactoryForScheme - UUID='"
+	  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x'",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
+
     closeFactory();
 
     // lock static maps
@@ -135,7 +143,9 @@ void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
     uuidVector.appendArray(uuid, sizeof(uuid));
     ssize_t index = mUUIDToLibraryPathMap.indexOfKey(uuidVector);
     if (index >= 0) {
+      ALOGV("Drm::findFactoryForScheme - Found an entry (%d) for this scheme", index);
         if (loadLibraryForScheme(mUUIDToLibraryPathMap[index], uuid)) {
+	  ALOGV("Drm::findFactoryForScheme - Plugin (idx %d) loaded !", index);
             mInitCheck = OK;
             return;
         } else {
@@ -149,6 +159,8 @@ void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
     String8 dirPath("/vendor/lib/mediadrm");
     DIR* pDir = opendir(dirPath.string());
 
+    ALOGV("Drm::findFactoryForScheme - Trying to load plugins in /vendor/lib/mediadrm");
+
     if (pDir == NULL) {
         mInitCheck = ERROR_UNSUPPORTED;
         ALOGE("Failed to open plugin directory %s", dirPath.string());
@@ -161,9 +173,11 @@ void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
 
         String8 pluginPath = dirPath + "/" + pEntry->d_name;
 
+	ALOGV("Drm::findFactoryForScheme - Try plugin path '%s'", pluginPath.string());
         if (pluginPath.getPathExtension() == ".so") {
 
             if (loadLibraryForScheme(pluginPath, uuid)) {
+	      ALOGV("Drm::findFactoryForScheme - Plugin '%s' loaded", pluginPath.string());
                 mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
                 mInitCheck = OK;
                 closedir(pDir);
@@ -180,6 +194,15 @@ void Drm::findFactoryForScheme(const uint8_t uuid[16]) {
 
 bool Drm::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
 
+    ALOGV("Drm::loadLibraryForScheme - Enter");
+    ALOGV("Drm::loadLibraryForScheme - path = '%s'", path.string());
+    ALOGV("Drm::loadLibraryForScheme - UUID='"
+	  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x'",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
+
     // get strong pointer to open shared library
     ssize_t index = mLibraryPathToOpenLibraryMap.indexOfKey(path);
     if (index >= 0) {
@@ -189,25 +212,51 @@ bool Drm::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
     }
 
     if (!mLibrary.get()) {
+      ALOGV("Drm::loadLibraryForScheme - Opening library '%s'", path.string());
         mLibrary = new SharedLibrary(path);
         if (!*mLibrary) {
+	  ALOGE("Drm::loadLibraryForScheme - Cannot open library '%s'", path.string());
             return false;
         }
 
         mLibraryPathToOpenLibraryMap.replaceValueAt(index, mLibrary);
     }
 
+    ALOGV("Drm::loadLibraryForScheme - Lookup DRM factory in library '%s'", path.string());
+
     typedef DrmFactory *(*CreateDrmFactoryFunc)();
 
     CreateDrmFactoryFunc createDrmFactory =
         (CreateDrmFactoryFunc)mLibrary->lookup("createDrmFactory");
 
+    ALOGV("Drm::loadLibraryForScheme - Factory at %p: calling...", createDrmFactory);
+
     if (createDrmFactory == NULL ||
-        (mFactory = createDrmFactory()) == NULL ||
-        !mFactory->isCryptoSchemeSupported(uuid)) {
-        closeFactory();
-        return false;
-    }
+        (mFactory = createDrmFactory()) == NULL)
+      {
+	closeFactory();
+	ALOGE("Drm::loadLibraryForScheme - Cannot invoke DRM factory");
+	return false;	
+      }
+    else
+      {
+	bool supp = mFactory->isCryptoSchemeSupported(uuid);
+	ALOGE("Drm::loadLibraryForScheme - Got DRM factory: UUID supported ? %s", supp ? "YES" : "NO");
+	if (!supp) 
+	  {
+	    closeFactory();
+	    ALOGE("Drm::loadLibraryForScheme - Plugin at '%s' do not support scheme "
+		  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x'",
+		  path.string(),
+		  uuid[0], uuid[1], uuid[2], uuid[3], 
+		  uuid[4], uuid[5], uuid[6], uuid[7], 
+		  uuid[8], uuid[9], uuid[10], uuid[11], 
+		  uuid[12], uuid[13], uuid[14], uuid[15]);
+	    return false;
+	  }
+      }
+
+    ALOGV("Drm::loadLibraryForScheme - DRM factory called successfully: UUID supported !!!");
     return true;
 }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "DrmManager(Native)"
 #include "utils/Log.h"
 
@@ -88,23 +88,32 @@ void DrmManager::removeUniqueId(int uniqueId) {
 }
 
 status_t DrmManager::loadPlugIns() {
+    ALOGV("DrmManager::loadPlugIns - Enter");
 
     String8 vendorPluginDirPath("/vendor/lib/drm");
+    ALOGV("DrmManager::loadPlugIns - loading from '%s'", vendorPluginDirPath.string());
     loadPlugIns(vendorPluginDirPath);
 
     String8 pluginDirPath("/system/lib/drm");
+    ALOGV("DrmManager::loadPlugIns - loading from '%s'", pluginDirPath.string());
     loadPlugIns(pluginDirPath);
     return DRM_NO_ERROR;
 
 }
 
 status_t DrmManager::loadPlugIns(const String8& plugInDirPath) {
+
+    ALOGV("DrmManager::loadPlugIns(<path>) - Enter");
+
     mPlugInManager.loadPlugIns(plugInDirPath);
     Vector<String8> plugInPathList = mPlugInManager.getPlugInIdList();
+    ALOGV("DrmManager::loadPlugIns(<path>) - Found %d plugins", plugInPathList.size());
     for (unsigned int i = 0; i < plugInPathList.size(); ++i) {
         String8 plugInPath = plugInPathList[i];
         DrmSupportInfo* info = mPlugInManager.getPlugIn(plugInPath).getSupportInfo(0);
+	ALOGV("DrmManager::loadPlugIns(<path>) - plugin %s ...", plugInPath.string());
         if (NULL != info) {
+	    ALOGV("DrmManager::loadPlugIns(<path>) - ... %s", info->getDescription().string());
             if (mSupportInfoToPlugInIdMap.indexOfKey(*info) < 0) {
                 mSupportInfoToPlugInIdMap.add(*info, plugInPath);
             }
@@ -423,10 +432,13 @@ DecryptHandle* DrmManager::openDecryptSession(
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     Vector<String8> plugInIdList = mPlugInManager.getPlugInIdList();
 
+    ALOGV("Opening decrypt session ... [%d] (%d, 0x%llx, %lld) / %s", uniqueId, fd, offset, length, mime);
+
     DecryptHandle* handle = new DecryptHandle();
     if (NULL != handle) {
         handle->decryptId = mDecryptSessionId + 1;
 
+	ALOGV("Decrypt sessionId: handle->decryptId = %d", handle->decryptId);
         for (unsigned int index = 0; index < plugInIdList.size(); index++) {
             String8 plugInId = plugInIdList.itemAt(index);
             IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInId);
@@ -441,6 +453,7 @@ DecryptHandle* DrmManager::openDecryptSession(
     }
     if (DRM_NO_ERROR != result) {
         delete handle; handle = NULL;
+	ALOGV("DrmManager::openDecryptSession: no capable plug-in found");
     }
     return handle;
 }
@@ -450,6 +463,8 @@ DecryptHandle* DrmManager::openDecryptSession(
     Mutex::Autolock _l(mDecryptLock);
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     Vector<String8> plugInIdList = mPlugInManager.getPlugInIdList();
+
+    ALOGV("Opening decrypt session ... [%d] %s / %s", uniqueId, uri, mime);
 
     DecryptHandle* handle = new DecryptHandle();
     if (NULL != handle) {
@@ -479,6 +494,8 @@ DecryptHandle* DrmManager::openDecryptSession(
     Mutex::Autolock _l(mDecryptLock);
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     Vector<String8> plugInIdList = mPlugInManager.getPlugInIdList();
+
+    ALOGV("Opening decrypt session ... [%d] buffer / %s", uniqueId, mimeType.string());
 
     DecryptHandle* handle = new DecryptHandle();
     if (NULL != handle) {

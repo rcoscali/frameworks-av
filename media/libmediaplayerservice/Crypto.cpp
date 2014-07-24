@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "Crypto"
 #include <utils/Log.h>
 #include <dirent.h>
@@ -81,16 +81,27 @@ status_t Crypto::initCheck() const {
  */
 void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
 
+    ALOGV("Crypto::findFactoryForScheme - Enter");
+
     closeFactory();
 
     // lock static maps
     Mutex::Autolock autoLock(mMapLock);
+
+    ALOGV("Crypto::findFactoryForScheme - searching plugin cache...");
+    ALOGV("... for UUID %02x%02x%02x%02x-%02x%02x-%02x%02x-"
+	  "%02x%02x-%02x%02x%02x%02x%02x%02x",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
 
     // first check cache
     Vector<uint8_t> uuidVector;
     uuidVector.appendArray(uuid, sizeof(uuid));
     ssize_t index = mUUIDToLibraryPathMap.indexOfKey(uuidVector);
     if (index >= 0) {
+        ALOGV("Crypto::findFactoryForScheme - found a cache entry for this UUID");
         if (loadLibraryForScheme(mUUIDToLibraryPathMap[index], uuid)) {
             mInitCheck = OK;
             return;
@@ -101,9 +112,13 @@ void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
         }
     }
 
+    ALOGV("Crypto::findFactoryForScheme - No cache entry found !");
+    ALOGV("Crypto::findFactoryForScheme - searching a plugin to load ...");
     // no luck, have to search
     String8 dirPath("/vendor/lib/mediadrm");
     String8 pluginPath;
+
+    ALOGV("Crypto::findFactoryForScheme - ... from '%s'", dirPath.string());
 
     DIR* pDir = opendir(dirPath.string());
     if (pDir) {
@@ -111,10 +126,19 @@ void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
         while ((pEntry = readdir(pDir))) {
 
             pluginPath = dirPath + "/" + pEntry->d_name;
+	    ALOGV("Crypto::findFactoryForScheme - Trying file at %s", pluginPath.string());
 
             if (pluginPath.getPathExtension() == ".so") {
 
+	        ALOGV("Crypto::findFactoryForScheme - Try to load this library and matching UUID ...");
+		ALOGV("... %02x%02x%02x%02x-%02x%02x-%02x%02x-"
+		      "%02x%02x-%02x%02x%02x%02x%02x%02x",
+		      uuid[0], uuid[1], uuid[2], uuid[3], 
+		      uuid[4], uuid[5], uuid[6], uuid[7], 
+		      uuid[8], uuid[9], uuid[10], uuid[11], 
+		      uuid[12], uuid[13], uuid[14], uuid[15]);
                 if (loadLibraryForScheme(pluginPath, uuid)) {
+		    ALOGV("Crypto::findFactoryForScheme - Adding plugin at %s in cache", pluginPath.string());
                     mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
                     mInitCheck = OK;
                     closedir(pDir);
@@ -126,9 +150,13 @@ void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
         closedir(pDir);
     }
 
+    ALOGV("Crypto::findFactoryForScheme - No luck: trying legacy libdrmdecrypt.so");
+
     // try the legacy libdrmdecrypt.so
     pluginPath = "libdrmdecrypt.so";
     if (loadLibraryForScheme(pluginPath, uuid)) {
+        ALOGV("Crypto::findFactoryForScheme - Yes :) ! this is your lucky day !");
+        ALOGV("Crypto::findFactoryForScheme - Adding legacy library libdrmdecrypt.so to cache");
         mUUIDToLibraryPathMap.add(uuidVector, pluginPath);
         mInitCheck = OK;
         return;
@@ -140,6 +168,16 @@ void Crypto::findFactoryForScheme(const uint8_t uuid[16]) {
 
 bool Crypto::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
 
+    ALOGV("Crypto::loadLibraryForScheme - Enter");
+
+    ALOGV("Crypto::loadLibraryForScheme - path = '%s'", path.string());
+    ALOGV("Crypto::loadLibraryForScheme - UUID = '%02x%02x%02x%02x-%02x%02x-%02x%02x-"
+	  "%02x%02x-%02x%02x%02x%02x%02x%02x'",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
+
     // get strong pointer to open shared library
     ssize_t index = mLibraryPathToOpenLibraryMap.indexOfKey(path);
     if (index >= 0) {
@@ -147,15 +185,20 @@ bool Crypto::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
     } else {
         index = mLibraryPathToOpenLibraryMap.add(path, NULL);
     }
+    
+    ALOGV("Crypto::loadLibraryForScheme - Found library from cache");
 
     if (!mLibrary.get()) {
         mLibrary = new SharedLibrary(path);
         if (!*mLibrary) {
+ 	    ALOGE("Crypto::loadLibraryForScheme - Error: library %s not loaded", path.string());
             return false;
         }
 
         mLibraryPathToOpenLibraryMap.replaceValueAt(index, mLibrary);
     }
+
+    ALOGV("Crypto::loadLibraryForScheme - Library loaded");
 
     typedef CryptoFactory *(*CreateCryptoFactoryFunc)();
 
@@ -165,9 +208,18 @@ bool Crypto::loadLibraryForScheme(const String8 &path, const uint8_t uuid[16]) {
     if (createCryptoFactory == NULL ||
         (mFactory = createCryptoFactory()) == NULL ||
         !mFactory->isCryptoSchemeSupported(uuid)) {
+        ALOGV("Crypto::loadLibraryForScheme - Factory not available");
         closeFactory();
         return false;
     }
+
+    ALOGV("Crypto::loadLibraryForScheme - Plugin for scheme '%02x%02x%02x%02x"
+	  "-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x' ready",
+	  uuid[0], uuid[1], uuid[2], uuid[3], 
+	  uuid[4], uuid[5], uuid[6], uuid[7], 
+	  uuid[8], uuid[9], uuid[10], uuid[11], 
+	  uuid[12], uuid[13], uuid[14], uuid[15]);
+
     return true;
 }
 
@@ -179,6 +231,7 @@ bool Crypto::isCryptoSchemeSupported(const uint8_t uuid[16]) {
     }
 
     findFactoryForScheme(uuid);
+    ALOGV("Crypto::loadLibraryForScheme - Scheme %s", (mInitCheck == OK ? "SUPPORTED" : "NOT Supported"));
     return (mInitCheck == OK);
 }
 

@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "drmserver"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
@@ -30,9 +30,11 @@ int main(int argc, char** argv)
 {
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
-    ALOGV("ServiceManager: %p", sm.get());
+    ALOGI("drmserver::main - ServiceManager: %p", sm.get());
     DrmManagerService::instantiate();
     ProcessState::self()->startThreadPool();
+    ALOGV("drmserver::main - Started");
     IPCThreadState::self()->joinThreadPool();
+    ALOGW("drmserver::main - Terminated");
 }
 

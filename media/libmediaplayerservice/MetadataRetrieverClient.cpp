@@ -17,7 +17,7 @@
 
 /* Copyright 2009-2013 Freescale Semiconductor Inc. */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "MetadataRetrieverClient"
 #include <utils/Log.h>
 
