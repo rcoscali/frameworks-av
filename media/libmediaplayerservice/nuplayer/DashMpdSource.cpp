@@ -15,10 +15,10 @@
  */
 
 #define LOG_NDEBUG 0
-#define LOG_TAG "HTTPLiveSource"
+#define LOG_TAG "DashMpdSource"
 #include <utils/Log.h>
 
-#include "HTTPLiveSource.h"
+#include "DashMpdSource.h"
 
 #include "ATSParser.h"
 #include "AnotherPacketSource.h"
@@ -33,7 +33,7 @@
 
 namespace android {
 
-NuPlayer::HTTPLiveSource::HTTPLiveSource(
+NuPlayer::DashMpdSource::DashMpdSource(
         const sp<AMessage> &notify,
         const char *url,
         const KeyedVector<String8, String8> *headers,
@@ -59,14 +59,14 @@ NuPlayer::HTTPLiveSource::HTTPLiveSource(
     }
 }
 
-NuPlayer::HTTPLiveSource::~HTTPLiveSource() {
+NuPlayer::DashMpdSource::~DashMpdSource() {
     if (mLiveSession != NULL) {
         mLiveSession->disconnect();
         mLiveLooper->stop();
     }
 }
 
-void NuPlayer::HTTPLiveSource::prepareAsync() {
+void NuPlayer::DashMpdSource::prepareAsync() {
     mLiveLooper = new ALooper;
     mLiveLooper->setName("http live");
     mLiveLooper->start();
@@ -86,10 +86,10 @@ void NuPlayer::HTTPLiveSource::prepareAsync() {
     mTSParser = new ATSParser;
 }
 
-void NuPlayer::HTTPLiveSource::start() {
+void NuPlayer::DashMpdSource::start() {
 }
 
-sp<MetaData> NuPlayer::HTTPLiveSource::getFormatMeta(bool audio) {
+sp<MetaData> NuPlayer::DashMpdSource::getFormatMeta(bool audio) {
     ATSParser::SourceType type =
         audio ? ATSParser::AUDIO : ATSParser::VIDEO;
 
@@ -103,7 +103,7 @@ sp<MetaData> NuPlayer::HTTPLiveSource::getFormatMeta(bool audio) {
     return source->getFormat();
 }
 
-status_t NuPlayer::HTTPLiveSource::feedMoreTSData() {
+status_t NuPlayer::DashMpdSource::feedMoreTSData() {
     if (mFinalResult != OK) {
         return mFinalResult;
     }
@@ -164,7 +164,7 @@ status_t NuPlayer::HTTPLiveSource::feedMoreTSData() {
     return OK;
 }
 
-status_t NuPlayer::HTTPLiveSource::dequeueAccessUnit(
+status_t NuPlayer::DashMpdSource::dequeueAccessUnit(
         bool audio, sp<ABuffer> *accessUnit) {
     ATSParser::SourceType type =
         audio ? ATSParser::AUDIO : ATSParser::VIDEO;
@@ -184,11 +184,11 @@ status_t NuPlayer::HTTPLiveSource::dequeueAccessUnit(
     return source->dequeueAccessUnit(accessUnit);
 }
 
-status_t NuPlayer::HTTPLiveSource::getDuration(int64_t *durationUs) {
+status_t NuPlayer::DashMpdSource::getDuration(int64_t *durationUs) {
     return mLiveSession->getDuration(durationUs);
 }
 
-status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs) {
+status_t NuPlayer::DashMpdSource::seekTo(int64_t seekTimeUs) {
     // We need to make sure we're not seeking until we have seen the very first
     // PTS timestamp in the whole stream (from the beginning of the stream).
     while (!mTSParser->PTSTimeDeltaEstablished() && feedMoreTSData() == OK) {
@@ -200,7 +200,7 @@ status_t NuPlayer::HTTPLiveSource::seekTo(int64_t seekTimeUs) {
     return OK;
 }
 
-void NuPlayer::HTTPLiveSource::onMessageReceived(const sp<AMessage> &msg) {
+void NuPlayer::DashMpdSource::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSessionNotify:
         {
@@ -214,7 +214,7 @@ void NuPlayer::HTTPLiveSource::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer::HTTPLiveSource::onSessionNotify(const sp<AMessage> &msg) {
+void NuPlayer::DashMpdSource::onSessionNotify(const sp<AMessage> &msg) {
     int32_t what;
     CHECK(msg->findInt32("what", &what));
 

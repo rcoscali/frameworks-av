@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef HTTP_LIVE_SOURCE_H_
+#ifndef DASH_MPD_SOURCE_H_
 
-#define HTTP_LIVE_SOURCE_H_
+#define DASH_MPD_SOURCE_H_
 
 #include "NuPlayer.h"
 #include "NuPlayerSource.h"
 
 namespace android {
 
-struct ATSParser;
-struct LiveSession;
+  struct ATSParser;
+  struct LiveSession;
 
-struct NuPlayer::HTTPLiveSource : public NuPlayer::Source {
-    HTTPLiveSource(
+struct NuPlayer::DashMpdSource : public NuPlayer::Source {
+    DashMpdSource(
             const sp<AMessage> &notify,
             const char *url,
             const KeyedVector<String8, String8> *headers,
@@ -45,7 +45,7 @@ struct NuPlayer::HTTPLiveSource : public NuPlayer::Source {
     virtual status_t seekTo(int64_t seekTimeUs);
 
 protected:
-    virtual ~HTTPLiveSource();
+    virtual ~DashMpdSource();
 
     virtual sp<MetaData> getFormatMeta(bool audio);
 
@@ -74,7 +74,7 @@ private:
 
     void onSessionNotify(const sp<AMessage> &msg);
 
-    DISALLOW_EVIL_CONSTRUCTORS(HTTPLiveSource);
+    DISALLOW_EVIL_CONSTRUCTORS(DashMpdSource);
 };
 
 }  // namespace android

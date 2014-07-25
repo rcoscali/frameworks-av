@@ -17,6 +17,7 @@
 
 /* Copyright (C) 2013 Freescale Semiconductor, Inc. */
 
+#define LOG_NDEBUG 0
 #define LOG_TAG "MediaPlayerFactory"
 #include <utils/Log.h>
 
@@ -44,6 +45,16 @@
 #endif
 
 namespace android {
+
+  static const char * PLAYER_NAMES[7] = {
+    /* 0, */ "- (none at 0)",
+    /* 1, */ "- (none at 1)",
+    /* 2, */ "SONIVOX_Player",
+    /* 3, */ "STAGEFRIGHT_Player",
+    /* 4, */ "NU_Player",
+    /* 5, */ "TEST_Player",
+    /* 6, */ "OMX_Player",
+  };
 
   Mutex MediaPlayerFactory::sLock;
   MediaPlayerFactory::tFactoryMap MediaPlayerFactory::sFactoryMap;
@@ -74,20 +85,20 @@ namespace android {
 
   player_type MediaPlayerFactory::getDefaultPlayerType() {
     char value[PROPERTY_VALUE_MAX];
-    ALOGV("MediaPlayerFactory::getDefaultPlayerType - Enter");
+    ALOGD("MediaPlayerFactory::getDefaultPlayerType - Enter");
     if (property_get("media.stagefright.use-nuplayer", value, NULL)
 	&& (!strcmp("1", value) || !strcasecmp("true", value))) 
       {
-	ALOGV("MediaPlayerFactory::getDefaultPlayerType - media.stagefright.use-nuplayer == 1 : Using NuPlayer\n");
+	ALOGD("MediaPlayerFactory::getDefaultPlayerType - media.stagefright.use-nuplayer == 1 : Using NuPlayer\n");
         return NU_PLAYER;
       }
     if (value == NULL)
       {
-	ALOGV("MediaPlayerFactory::getDefaultPlayerType - media.stagefright.use-nuplayer not set  : Using StagefrightPlayer\n");
+	ALOGD("MediaPlayerFactory::getDefaultPlayerType - media.stagefright.use-nuplayer not set  : Using StagefrightPlayer\n");
       }
     else
       {
-	ALOGV("MediaPlayerFactory::getDefaultPlayerType - media.stagefright.use-nuplayer == 0  : Using StagefrightPlayer\n");
+	ALOGD("MediaPlayerFactory::getDefaultPlayerType - media.stagefright.use-nuplayer == 0  : Using StagefrightPlayer\n");
       }
     return STAGEFRIGHT_PLAYER;
   }
@@ -108,42 +119,61 @@ namespace android {
                                                         \
   player_type ret = STAGEFRIGHT_PLAYER;			\
   float bestScore = 0.0;				\
+  int winner = -1; 				        \
                                                         \
+  ALOGD("GET_PLAYER_TYPE_IMPL - %d registered players\n", sFactoryMap.size());  \
   for (size_t i = 0; i < sFactoryMap.size(); ++i) {	\
+    ALOGD("GET_PLAYER_TYPE_IMPL -     try player #%d\n", i);\
                                                         \
     IFactory* v = sFactoryMap.valueAt(i);		\
     float thisScore;					\
     CHECK(v != NULL);					\
     thisScore = v->scoreFactory(a);			\
+    ALOGD("GET_PLAYER_TYPE_IMPL -     player[%d]=%f\n", i, thisScore);	\
     if (thisScore > bestScore) {			\
       ret = sFactoryMap.keyAt(i);			\
       bestScore = thisScore;				\
+      winner = i;	 			        \
+      ALOGD("GET_PLAYER_TYPE_IMPL -     new best score for %s\n", PLAYER_NAMES[ret]);	\
     }							\
   }							\
                                                         \
-  if (0.0 == bestScore) {				\
-    ret = getDefaultPlayerType();			\
-  }							\
+  if (0.0 == bestScore)                                 \
+    {				                        \
+      ALOGD("GET_PLAYER_TYPE_IMPL - no best score - get default\n");	\
+      ret = getDefaultPlayerType();			\
+    }							\
+  else                                                  \
+    {							\
+      ALOGD("GET_PLAYER_TYPE_IMPL - best score = %f\n", bestScore); \
+      ALOGD("GET_PLAYER_TYPE_IMPL - for player[%d]=%s\n", winner, PLAYER_NAMES[ret]); \
+    }							\
                                                         \
   return ret;
 
   player_type MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client,
     const char* url,
-    const KeyedVector<String8, String8> *headers) {
-  GET_PLAYER_TYPE_IMPL(client, url, bestScore, headers);
-}
+    const KeyedVector<String8, String8> *headers) 
+  {
+    ALOGD("MediaPlayerFactory::getPlayerType(%s) - Enter\n", url);
+    GET_PLAYER_TYPE_IMPL(client, url, bestScore, headers);
+  }
 
   player_type MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client,
     int fd,
     int64_t offset,
-    int64_t length) {
-  GET_PLAYER_TYPE_IMPL(client, fd, offset, length, bestScore);
-}
+    int64_t length) 
+  {
+    ALOGD("MediaPlayerFactory::getPlayerType(fd[%d] at {%lld=>%lld}) - Enter\n", fd, offset, length);
+    GET_PLAYER_TYPE_IMPL(client, fd, offset, length, bestScore);
+  }
 
   player_type MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client,
-    const sp<IStreamSource> &source) {
-  GET_PLAYER_TYPE_IMPL(client, source, bestScore);
-}
+    const sp<IStreamSource> &source) 
+  {
+    ALOGD("MediaPlayerFactory::getPlayerType(stream-source) - Enter\n");
+    GET_PLAYER_TYPE_IMPL(client, source, bestScore);
+  }
 
 #undef GET_PLAYER_TYPE_IMPL
 
@@ -157,7 +187,7 @@ namespace android {
     status_t init_result;
     Mutex::Autolock lock_(&sLock);
     
-    ALOGV("MediaPlayerFactory::createPlayer - Enter\n");
+    ALOGD("MediaPlayerFactory::createPlayer - Enter\n");
     ALOGD("MediaPlayerFactory::createPlayer - playerType = %d\n", playerType);
     ALOGD("MediaPlayerFactory::createPlayer - cookie = %p\n", cookie);
     
@@ -343,7 +373,7 @@ namespace android {
 			       float curScore,
 			       const KeyedVector<String8, String8> *headers) {
 
-      ALOGV("OMXPlayerFactory:scoreFactory - Enter\n");
+      ALOGD("OMXPlayerFactory:scoreFactory - Enter\n");
 
       ALOGD("OMXPlayerFactory:scoreFactory - url = %s\n", url);
       ALOGD("OMXPlayerFactory:scoreFactory - cur score = %f\n", curScore);
@@ -387,53 +417,56 @@ namespace android {
       if (!(property_get("media.omxgm.enable-player", value, NULL)
 	    && (!strcmp("1", value) || !strcasecmp("true", value)))) 
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - OMX player enabled by property scored 0.0\n");
+	  ALOGD("OMXPlayerFactory:scoreFactory - OMX player enabled by property scored 0.0\n");
 	  return 0.0;
 	}
 
       if (kOurScore <= curScore)
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - low score: scored 0.0\n");
+	  ALOGD("OMXPlayerFactory:scoreFactory - low score: scored 0.0\n");
 	  return 0.0;
 	}
 
       if (!strncasecmp("widevine://", url, 11)) 
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - widevine: scored 0.0\n");
+	  ALOGD("OMXPlayerFactory:scoreFactory - widevine: scored 0.0\n");
 	  return 0.0;
 	}
 
       if (!strncasecmp(url, "http://", 7)) { 
 	if (isWVM(url, headers))
 	  {
-	    ALOGV("OMXPlayerFactory:scoreFactory - http + wvm: scored 0.0\n");
+	    ALOGD("OMXPlayerFactory:scoreFactory - http + wvm: scored 0.0\n");
 	    return 0.0;
 	  }
       }
 
-      if (!strncasecmp(url, "http://", 7) \
-	  || !strncasecmp(url, "rtsp://", 7) \
-	  || !strncasecmp(url, "udp://", 6) \
-	  || !strncasecmp(url, "rtp://", 6))
+      size_t lenURL = strlen(url);
+      if (!strncasecmp(url, "http://", 7)  ||
+	  !strncasecmp(url, "https://", 8) ||
+	  !strncasecmp(url, "rtsp://", 7)  ||
+	  !strncasecmp(url, "udp://", 6)   ||
+	  !strncasecmp(url, "rtp://", 6)   &&
+	  ((lenURL >= 5 && strcasecmp(".m3u8", &url[lenURL - 5])) &&
+	   (lenURL >= 4 && strcasecmp(".mpd", &url[lenURL - 4]))))
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - scheme http/rtsp/udp/rtp: scored %f\n", kOurScore);
+	  ALOGD("OMXPlayerFactory:scoreFactory - scheme http/rtsp/udp/rtp without HLS/DASH: scored %f\n", kOurScore);
 	  return kOurScore;
 	}
 
-      int lenURL = strlen(url);
       for (int i = 0; i < NELEM(FILE_EXTS); ++i) {
 	int len = strlen(FILE_EXTS[i]);
 	int start = lenURL - len;
 	if (start > 0) {
 	  if (!strncasecmp(url + start, FILE_EXTS[i], len)) 
 	    {
-	      ALOGV("OMXPlayerFactory:scoreFactory - supported file ext '%s': scored %f\n", FILE_EXTS[i], kOurScore);
+	      ALOGD("OMXPlayerFactory:scoreFactory - supported file ext '%s': scored %f\n", FILE_EXTS[i], kOurScore);
 	      return kOurScore;
 	    }
 	}
       }
 
-      ALOGV("OMXPlayerFactory:scoreFactory - Scored 0.0\n");
+      ALOGD("OMXPlayerFactory:scoreFactory - Scored 0.0\n");
       return 0.0;
     }
 
@@ -444,28 +477,29 @@ namespace android {
 			       float curScore) {
       static const float kOurScore = 1.0;
 
-      ALOGV("OMXPlayerFactory:scoreFactory - Enter\n");
+      ALOGD("OMXPlayerFactory:scoreFactory - Enter\n");
 
       ALOGD("OMXPlayerFactory:scoreFactory - fd[%d] at {%lld=>%lld}\n", fd, offset, length);
       ALOGD("OMXPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+      ALOGD("OMXPlayerFactory:scoreFactory - def score = %f\n", kOurScore);
 
       char value[PROPERTY_VALUE_MAX];
-      if (!(property_get("media.omxgm.enable-player", value, NULL)
-	    && (!strcmp("1", value) || !strcasecmp("true", value)))) 
+      if (! (property_get("media.omxgm.enable-player", value, NULL) &&
+	     (!strcmp("1", value) || !strcasecmp("true", value))) ) 
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - OMX player enabled by property scored 0.0\n");
+	  ALOGD("OMXPlayerFactory:scoreFactory - OMX player disabled by property: scored 0.0\n");
 	  return 0.0;
 	}
 
       if (kOurScore <= curScore)
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - low score: scored 0.0\n");
+	  ALOGD("OMXPlayerFactory:scoreFactory - low score: scored 0.0\n");
 	  return 0.0;
 	}
 
       if (isWVM(fd, offset, length))
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - is wvm: scored 0.0\n");
+	  ALOGD("OMXPlayerFactory:scoreFactory - is wvm: scored 0.0\n");
 	  return 0.0;
 	}
 
@@ -478,17 +512,17 @@ namespace android {
       delete pType;
       if(ret) 
 	{
-	  ALOGV("OMXPlayerFactory:scoreFactory - is supported content: scored %f\n", kOurScore);
+	  ALOGD("OMXPlayerFactory:scoreFactory - is supported content: scored %f\n", kOurScore);
 	  return kOurScore;
 	}
 
-      ALOGV("OMXPlayerFactory:scoreFactory - Scored 0.0\n");
+      ALOGD("OMXPlayerFactory:scoreFactory - Scored 0.0\n");
       return 0.0;
     }
 
     virtual sp<MediaPlayerBase> createPlayer() 
     {
-      ALOGV(" create OMXPlayer");
+      ALOGD(" create OMXPlayer");
       return new OMXPlayer();
     }
   };
@@ -508,10 +542,11 @@ namespace android {
       read(fd, buf, sizeof(buf));
       lseek(fd, offset, SEEK_SET);
 
-      ALOGV("StagefrightPlayerFactory:scoreFactory - Enter\n");
+      ALOGD("StagefrightPlayerFactory:scoreFactory - Enter\n");
 
       ALOGD("StagefrightPlayerFactory:scoreFactory - fd[%d] at {%lld=>%lld}\n", fd, offset, length);
       ALOGD("StagefrightPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+      ALOGD("StagefrightPlayerFactory:scoreFactory - def score = 1.0\n");
 
       long ident = *((long*)buf);
 
@@ -527,7 +562,7 @@ namespace android {
     }
 
     virtual sp<MediaPlayerBase> createPlayer() {
-      ALOGV(" create StagefrightPlayer");
+      ALOGD(" create StagefrightPlayer");
       return new StagefrightPlayer();
     }
   };
@@ -539,15 +574,17 @@ namespace android {
                                float curScore,
                                const KeyedVector<String8, String8> *headers) {
       static const float kOurScore = 0.8;
+      static const float kOurStreamingBonus = 0.2;
 
-      ALOGV("NuPlayerFactory:scoreFactory - Enter\n");
+      ALOGD("NuPlayerFactory:scoreFactory - Enter\n");
 
       ALOGD("NuPlayerFactory:scoreFactory - url '%s'\n", url);
       ALOGD("NuPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+      ALOGD("NuPlayerFactory:scoreFactory - def score = %f\n", kOurScore);
 
       if (kOurScore <= curScore)
 	{
-	  ALOGV("NuPlayerFactory:scoreFactory - low score: scored 0.0\n");
+	  ALOGD("NuPlayerFactory:scoreFactory - low score: scored 0.0\n");
 	  return 0.0;
 	}
 
@@ -556,46 +593,46 @@ namespace android {
 	  || !strncasecmp("file://", url, 7)) {
 	size_t len = strlen(url);
 
-	ALOGV("NuPlayerFactory:scoreFactory - Live (http/https/file)?\n");
+	ALOGD("NuPlayerFactory:scoreFactory - Live (http/https/file)?\n");
 
 	if (len >= 5 && !strcasecmp(".m3u8", &url[len - 5])) 
 	  {
-	    ALOGV("NuPlayerFactory:scoreFactory - m3u8 ext: scored %f\n", kOurScore);
-	    return kOurScore;
+	    ALOGD("NuPlayerFactory:scoreFactory - m3u8 ext: scored %f\n", kOurScore + kOurStreamingBonus);
+	    return kOurScore + kOurStreamingBonus;
 	  }
 
 	if (strstr(url,"m3u8")) 
 	  {
-	    ALOGV("NuPlayerFactory:scoreFactory - m3u8: scored %f\n", kOurScore);
-	    return kOurScore;
+	    ALOGD("NuPlayerFactory:scoreFactory - m3u8: scored %f\n", kOurScore + kOurStreamingBonus);
+	    return kOurScore + kOurStreamingBonus;
 	  }
 
 	if (len >= 4 && !strcasecmp(".mpd", &url[len - 4])) 
 	  {
-	    ALOGV("NuPlayerFactory:scoreFactory - mdp ext: scored %f\n", kOurScore);
-	    return kOurScore;
+	    ALOGD("NuPlayerFactory:scoreFactory - mdp ext: scored %f\n", kOurScore + kOurStreamingBonus);
+	    return kOurScore + kOurStreamingBonus;
 	  }
 
 	if (strstr(url,"mpd")) 
 	  {
-	    ALOGV("NuPlayerFactory:scoreFactory - mdp: scored %f\n", kOurScore);
-	    return kOurScore;
+	    ALOGD("NuPlayerFactory:scoreFactory - mdp: scored %f\n", kOurScore + kOurStreamingBonus);
+	    return kOurScore + kOurStreamingBonus;
 	  }
 
 	if ((len >= 4 && !strcasecmp(".sdp", &url[len - 4])) || strstr(url, ".sdp?")) 
 	  {
-	    ALOGV("NuPlayerFactory:scoreFactory - sdp ext: scored %f\n", kOurScore);
+	    ALOGD("NuPlayerFactory:scoreFactory - sdp ext: scored %f\n", kOurScore);
 	    return kOurScore;
 	  }
       }
 
       if (!strncasecmp("rtsp://", url, 7)) 
 	{
-	  ALOGV("NuPlayerFactory:scoreFactory - rtsp scheme: scored %f\n", kOurScore);
+	  ALOGD("NuPlayerFactory:scoreFactory - rtsp scheme: scored %f\n", kOurScore);
 	  return kOurScore;
 	}
 
-      ALOGV("NuPlayerFactory:scoreFactory - no match: scored 0.0\n");
+      ALOGD("NuPlayerFactory:scoreFactory - no match: scored 0.0\n");
       return 0.0;
     }
   
@@ -603,13 +640,13 @@ namespace android {
                                const sp<IStreamSource> &source,
                                float curScore) 
     {
-      ALOGV("NuPlayerFactory:scoreFactory - score 1.0\n");
+      ALOGD("NuPlayerFactory:scoreFactory - score 1.0\n");
       return 1.0;
     }
   
     virtual sp<MediaPlayerBase> createPlayer() 
     {
-      ALOGV(" create NuPlayer");
+      ALOGD(" create NuPlayer");
       return new NuPlayerDriver;
     }
   };
@@ -619,8 +656,16 @@ namespace android {
     virtual float scoreFactory(const sp<IMediaPlayer>& client,
                                const char* url,
                                float curScore,
-                               const KeyedVector<String8, String8> *headers) {
+                               const KeyedVector<String8, String8> *headers) 
+    {
+      ALOGD("SonivoxPlayerFactory:scoreFactory - Enter\n");
+
+      ALOGD("SonivoxPlayerFactory:scoreFactory - url '%s'\n", url);
+      ALOGD("SonivoxPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+
       static const float kOurScore = 0.4;
+      ALOGD("SonivoxPlayerFactory:scoreFactory - def score = %f\n", kOurScore);
+
       static const char* const FILE_EXTS[] = { ".mid",
 					       ".midi",
 					       ".smf",
@@ -631,19 +676,28 @@ namespace android {
 					       ".rtx",
 					       ".ota" };
       if (kOurScore <= curScore)
-	return 0.0;
+	{
+	  ALOGD("SonivoxPlayerFactory:scoreFactory - low score: scored 0.0\n");
+	  return 0.0;
+	}
 
+      ALOGD("SonivoxPlayerFactory:scoreFactory - searching for a supported file ext\n");
       // use MidiFile for MIDI extensions
       int lenURL = strlen(url);
-      for (int i = 0; i < NELEM(FILE_EXTS); ++i) {
-	int len = strlen(FILE_EXTS[i]);
-	int start = lenURL - len;
-	if (start > 0) {
-	  if (!strncasecmp(url + start, FILE_EXTS[i], len)) {
-	    return kOurScore;
-	  }
+      for (int i = 0; i < NELEM(FILE_EXTS); ++i) 
+	{
+	  ALOGD("SonivoxPlayerFactory:scoreFactory - check %s\n", FILE_EXTS[i]);
+	  int len = strlen(FILE_EXTS[i]);
+	  int start = lenURL - len;
+	  if (start > 0) 
+	    {
+	      if (!strncasecmp(url + start, FILE_EXTS[i], len)) 
+		{
+		  ALOGD("SonivoxPlayerFactory:scoreFactory - MATCH: scored %f\n", kOurScore);
+		  return kOurScore;
+		}
+	    }
 	}
-      }
 
       return 0.0;
     }
@@ -652,11 +706,23 @@ namespace android {
                                int fd,
                                int64_t offset,
                                int64_t length,
-                               float curScore) {
+                               float curScore) 
+    {
+      ALOGD("SonivoxPlayerFactory:scoreFactory(fd[%d] {%lld=>%lld}) - Enter\n", fd, offset, length);
+
+      ALOGD("SonivoxPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+
       static const float kOurScore = 0.8;
+      
+      ALOGD("SonivoxPlayerFactory:scoreFactory - def score = %f\n", kOurScore);
 
       if (kOurScore <= curScore)
-	return 0.0;
+	{
+	  ALOGD("SonivoxPlayerFactory:scoreFactory - low score: scored 0.0\n");
+	  return 0.0;
+	}
+      
+      ALOGD("SonivoxPlayerFactory:scoreFactory - Check midi device availability ...\n");
 
       // Some kind of MIDI?
       EAS_DATA_HANDLE easdata;
@@ -670,35 +736,50 @@ namespace android {
 	if (EAS_OpenFile(easdata, &locator, &eashandle) == EAS_SUCCESS) {
 	  EAS_CloseFile(easdata, eashandle);
 	  EAS_Shutdown(easdata);
+	  ALOGD("SonivoxPlayerFactory:scoreFactory - ... yes: scored %f\n", kOurScore);
 	  return kOurScore;
 	}
 	EAS_Shutdown(easdata);
       }
 
+      ALOGD("SonivoxPlayerFactory:scoreFactory - ... no: scored 0.0\n");
       return 0.0;
     }
 
     virtual sp<MediaPlayerBase> createPlayer() {
-      ALOGV(" create MidiFile");
+      ALOGD(" create MidiFile");
       return new MidiFile();
     }
   };
 
-  class TestPlayerFactory : public MediaPlayerFactory::IFactory {
+  class TestPlayerFactory : public MediaPlayerFactory::IFactory 
+  {
   public:
     virtual float scoreFactory(const sp<IMediaPlayer>& client,
                                const char* url,
                                float curScore,
-                               const KeyedVector<String8, String8> *headers) {
-      if (TestPlayerStub::canBeUsed(url)) {
-	return 1.0;
-      }
+                               const KeyedVector<String8, String8> *headers) 
+    {
+      ALOGD("TestPlayerFactory:scoreFactory(%s) - Enter\n", url);
 
+      ALOGD("TestPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+
+      static const float kOurScore = 1.0;
+      
+      ALOGD("TestPlayerFactory:scoreFactory - def score = %f\n", kOurScore);
+
+      if (TestPlayerStub::canBeUsed(url)) 
+	{
+	  ALOGD("TestPlayerFactory:scoreFactory - use test: scored %f\n", kOurScore);
+	  return 1.0;
+	}
+
+      ALOGD("TestPlayerFactory:scoreFactory - don't use test: scored 0.0\n");
       return 0.0;
     }
 
     virtual sp<MediaPlayerBase> createPlayer() {
-      ALOGV("Create Test Player stub");
+      ALOGD("Create Test Player stub");
       return new TestPlayerStub();
     }
   };
@@ -710,11 +791,16 @@ namespace android {
       return;
 
 #ifdef FSL_GM_PLAYER
+    ALOGI("MediaPlayerFactory::registerBuiltinFactories - register OMX_PLAYER (%d)\n", OMX_PLAYER);
     registerFactory_l(new OMXPlayerFactory(), OMX_PLAYER);
 #endif
+    ALOGI("MediaPlayerFactory::registerBuiltinFactories - register STAGEFRIGHT_PLAYER (%d)\n", STAGEFRIGHT_PLAYER);
     registerFactory_l(new StagefrightPlayerFactory(), STAGEFRIGHT_PLAYER);
+    ALOGI("MediaPlayerFactory::registerBuiltinFactories - register NU_PLAYER (%d)\n", NU_PLAYER);
     registerFactory_l(new NuPlayerFactory(), NU_PLAYER);
+    ALOGI("MediaPlayerFactory::registerBuiltinFactories - register SONIVOX_PLAYER (%d)\n", SONIVOX_PLAYER);
     registerFactory_l(new SonivoxPlayerFactory(), SONIVOX_PLAYER);
+    ALOGI("MediaPlayerFactory::registerBuiltinFactories - register TEST_PLAYER (%d)\n", TEST_PLAYER);
     registerFactory_l(new TestPlayerFactory(), TEST_PLAYER);
 
     sInitComplete = true;

@@ -625,7 +625,7 @@ void MediaPlayerService::Client::setDataSource_post(
 status_t MediaPlayerService::Client::setDataSource(
         const char *url, const KeyedVector<String8, String8> *headers)
 {
-    ALOGV("setDataSource(%s)", url);
+  ALOGV("setDataSource(%s)", (url ? url : "?NULL?"));
     if (url == NULL)
         return UNKNOWN_ERROR;
 
@@ -635,27 +635,34 @@ status_t MediaPlayerService::Client::setDataSource(
         (strncmp(url, "rtp://", 6) == 0) ||
         (strncmp(url, "udp://", 6) == 0) ||
 #endif
-        (strncmp(url, "rtsp://", 7) == 0)) {
-        if (!checkPermission("android.permission.INTERNET")) {
-            return PERMISSION_DENIED;
-        }
-    }
-
-    if (strncmp(url, "content://", 10) == 0) {
+        (strncmp(url, "rtsp://", 7) == 0)) 
+      {
+        if (!checkPermission("android.permission.INTERNET")) 
+	  {
+	    ALOGW("MediaPlayerService::Client::setDataSource - Need INTERNET access but miss android.permission.INTERNET !!!\n");
+	    return PERMISSION_DENIED;
+	  }
+      }
+    
+    if (strncmp(url, "content://", 10) == 0) 
+      {
         // get a filedescriptor for the content Uri and
         // pass it to the setDataSource(fd) method
-
+	ALOGV("MediaPlayerService::Client::setDataSource - Get FD for the content\n");
         String16 url16(url);
         int fd = android::openContentProviderFile(url16);
         if (fd < 0)
-        {
+	  {
             ALOGE("Couldn't open fd for %s", url);
             return UNKNOWN_ERROR;
-        }
+	  }
         setDataSource(fd, 0, 0x7fffffffffLL); // this sets mStatus
         close(fd);
         return mStatus;
-    } else {
+      } 
+    else 
+      {
+	ALOGV("MediaPlayerService::Client::setDataSource - Try to find the better player for this content\n");
         player_type playerType = MediaPlayerFactory::getPlayerType(this, url, headers);
         sp<MediaPlayerBase> p = setDataSource_pre(playerType);
         if (p == NULL) {

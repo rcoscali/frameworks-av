@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "NuPlayer"
 #include <utils/Log.h>
 
@@ -51,7 +51,9 @@
 namespace android {
 
 struct NuPlayer::Action : public RefBase {
-    Action() {}
+    Action() {
+      ALOGV("NuPlayer::Action - Constructor\n");
+    }
 
     virtual void execute(NuPlayer *player) = 0;
 
@@ -62,6 +64,7 @@ private:
 struct NuPlayer::SeekAction : public Action {
     SeekAction(int64_t seekTimeUs)
         : mSeekTimeUs(seekTimeUs) {
+      ALOGV("NuPlayer::SeekAction - Constructor\n");
     }
 
     virtual void execute(NuPlayer *player) {
@@ -77,6 +80,7 @@ private:
 struct NuPlayer::SetSurfaceAction : public Action {
     SetSurfaceAction(const sp<NativeWindowWrapper> &wrapper)
         : mWrapper(wrapper) {
+      ALOGV("NuPlayer::SetSurfaceAction - Constructor\n");
     }
 
     virtual void execute(NuPlayer *player) {
@@ -96,6 +100,7 @@ struct NuPlayer::SimpleAction : public Action {
 
     SimpleAction(ActionFunc func)
         : mFunc(func) {
+      ALOGV("NuPlayer::SimpleAction - Constructor\n");
     }
 
     virtual void execute(NuPlayer *player) {
@@ -134,71 +139,132 @@ NuPlayer::NuPlayer()
 NuPlayer::~NuPlayer() {
 }
 
-void NuPlayer::setUID(uid_t uid) {
-    mUIDValid = true;
-    mUID = uid;
+void NuPlayer::setUID(uid_t uid) 
+{
+  ALOGV("NuPlayer::setUID - uid = %d\n", uid);
+  mUIDValid = true;
+  mUID = uid;
 }
 
 void NuPlayer::setDriver(const wp<NuPlayerDriver> &driver) {
-    mDriver = driver;
+  ALOGV("NuPlayer::setDriver - Enter\n");
+  mDriver = driver;
 }
 
-void NuPlayer::setDataSourceAsync(const sp<IStreamSource> &source) {
+void NuPlayer::setDataSourceAsync(const sp<IStreamSource> &source) 
+{
+  ALOGV("NuPlayer::setDataSourceAsync - Enter\n");
+  ALOGV("NuPlayer::setDataSourceAsync - id = %d\n", id());
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, id());
 
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, id());
 
     char prop[PROPERTY_VALUE_MAX];
-    if (property_get("media.stagefright.use-mp4source", prop, NULL)
-            && (!strcmp(prop, "1") || !strcasecmp(prop, "true"))) {
+    /* Force MP4Source for Dash tests */
+    if (1 || (property_get("media.stagefright.use-mp4source", prop, NULL)
+	      && (!strcmp(prop, "1") || !strcasecmp(prop, "true"))))
+      {
+	LOGV("NuPlayer::setDataSourceAsync - media.stagefright.use-mp4source set: use MP4Source\n");
         msg->setObject("source", new MP4Source(notify, source));
-    } else {
-        msg->setObject("source", new StreamingSource(notify, source));
-    }
+      } 
+    else 
+      {
+	LOGV("NuPlayer::setDataSourceAsync - media.stagefright.use-mp4source set: use StreamingSource\n");
+	msg->setObject("source", new StreamingSource(notify, source));
+      }
 
     msg->post();
 }
 
-static bool IsHTTPLiveURL(const char *url) {
-    if (!strncasecmp("http://", url, 7)
-            || !strncasecmp("https://", url, 8)
-            || !strncasecmp("file://", url, 7)) {
-        size_t len = strlen(url);
-        if (len >= 5 && !strcasecmp(".m3u8", &url[len - 5])) {
-            return true;
+static bool IsHTTPLiveURL(const char *url) 
+{
+  ALOGV("NuPlayer::IsHTTPLiveURL - url = '%s'\n", url);
+  if (!strncasecmp("http://", url, 7)
+      || !strncasecmp("https://", url, 8)
+      || !strncasecmp("file://", url, 7)) 
+    {
+      size_t len = strlen(url);
+      if (len >= 5 && !strcasecmp(".m3u8", &url[len - 5])) 
+	{
+	  ALOGV("NuPlayer::IsHTTPLiveURL - YES\n");
+	  return true;
         }
 
-        if (strstr(url,"m3u8")) {
-            return true;
+      if (strstr(url,"m3u8")) 
+	{
+	  ALOGV("NuPlayer::IsHTTPLiveURL - YES\n");
+	  return true;
         }
     }
-
-    return false;
+  
+  ALOGV("NuPlayer::IsHTTPLiveURL - NO\n");
+  return false;
 }
 
-void NuPlayer::setDataSourceAsync(
-        const char *url, const KeyedVector<String8, String8> *headers) {
-    sp<AMessage> msg = new AMessage(kWhatSetDataSource, id());
-    size_t len = strlen(url);
+static bool IsDashURL(const char *url) 
+{
+  ALOGV("NuPlayer::IsDashURL - url = '%s'\n", url);
+  if (!strncasecmp("http://", url, 7)
+      || !strncasecmp("https://", url, 8)
+      || !strncasecmp("file://", url, 7)) 
+    {
+      size_t len = strlen(url);
+      if (len >= 4 && !strcasecmp(".mpd", &url[len - 4])) 
+	{
+	  ALOGV("NuPlayer::IsDashURL - YES\n");
+	  return true;
+        }
 
-    sp<AMessage> notify = new AMessage(kWhatSourceNotify, id());
+      if (strstr(url,"mpd")) 
+	{
+	  ALOGV("NuPlayer::IsDashURL - YES\n");
+	  return true;
+        }
+    }
+  
+  ALOGV("NuPlayer::IsDashURL - NO\n");
+  return false;
+}
 
-    sp<Source> source;
-    if (IsHTTPLiveURL(url)) {
-        source = new HTTPLiveSource(notify, url, headers, mUIDValid, mUID);
-    } else if (!strncasecmp(url, "rtsp://", 7)) {
-        source = new RTSPSource(notify, url, headers, mUIDValid, mUID);
-    } else if ((!strncasecmp(url, "http://", 7)
-                || !strncasecmp(url, "https://", 8))
-                    && ((len >= 4 && !strcasecmp(".sdp", &url[len - 4]))
-                    || strstr(url, ".sdp?"))) {
-        source = new RTSPSource(notify, url, headers, mUIDValid, mUID, true);
-    } else {
-        source = new GenericSource(notify, url, headers, mUIDValid, mUID);
+void NuPlayer::setDataSourceAsync(const char *url, 
+				  const KeyedVector<String8, String8> *headers) 
+{
+  ALOGV("NuPlayer::setDataSourceAsync - url = '%s'\n", url);
+
+  sp<AMessage> msg = new AMessage(kWhatSetDataSource, id());
+  size_t len = strlen(url);
+
+  sp<AMessage> notify = new AMessage(kWhatSourceNotify, id());
+  
+  sp<Source> source;
+  if (IsHTTPLiveURL(url)) 
+    {
+      ALOGV("NuPlayer::setDataSourceAsync - Create HTTPLiveSource\n");
+      source = new HTTPLiveSource(notify, url, headers, mUIDValid, mUID);
+    } 
+  else if (IsDashURL(url)) 
+    {
+      ALOGV("NuPlayer::setDataSourceAsync - Create DashMpdSource\n");
+      source = new DashMpdSource(notify, url, headers, mUIDValid, mUID);
+    } 
+  else if (!strncasecmp(url, "rtsp://", 7)) 
+    {
+      source = new RTSPSource(notify, url, headers, mUIDValid, mUID);
+    } 
+  else if ((!strncasecmp(url, "http://", 7)
+	    || !strncasecmp(url, "https://", 8))
+	   && ((len >= 4 && !strcasecmp(".sdp", &url[len - 4]))
+	       || strstr(url, ".sdp?"))) 
+    {
+      source = new RTSPSource(notify, url, headers, mUIDValid, mUID, true);
+    } 
+  else 
+    {
+      source = new GenericSource(notify, url, headers, mUIDValid, mUID);
     }
 
-    msg->setObject("source", source);
-    msg->post();
+  msg->setObject("source", source);
+  msg->post();
 }
 
 void NuPlayer::setDataSourceAsync(int fd, int64_t offset, int64_t length) {
