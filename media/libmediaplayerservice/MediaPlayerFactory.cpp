@@ -35,6 +35,16 @@
 
 namespace android {
 
+  static const char * PLAYER_NAMES[7] = {
+    /* 0, */ "- (none at 0)",
+    /* 1, */ "- (none at 1)",
+    /* 2, */ "SONIVOX_Player",
+    /* 3, */ "STAGEFRIGHT_Player",
+    /* 4, */ "NU_Player",
+    /* 5, */ "TEST_Player",
+    /* 6, */ "OMX_Player",
+  };
+
   Mutex MediaPlayerFactory::sLock;
   MediaPlayerFactory::tFactoryMap MediaPlayerFactory::sFactoryMap;
   bool MediaPlayerFactory::sInitComplete = false;
@@ -94,29 +104,39 @@ namespace android {
   }
 
 #define GET_PLAYER_TYPE_IMPL(a...)                      \
-  Mutex::Autolock lock_(&sLock);                        \
+  Mutex::Autolock lock_(&sLock);			\
                                                         \
-  player_type ret = STAGEFRIGHT_PLAYER;                 \
-  float bestScore = 0.0;                                \
+  player_type ret = STAGEFRIGHT_PLAYER;			\
+  float bestScore = 0.0;				\
+  int winner = -1; 				        \
                                                         \
-  for (size_t i = 0; i < sFactoryMap.size(); ++i) {     \
+  ALOGD("GET_PLAYER_TYPE_IMPL - %d registered players\n", sFactoryMap.size());  \
+  for (size_t i = 0; i < sFactoryMap.size(); ++i) {	\
+    ALOGD("GET_PLAYER_TYPE_IMPL -     try player #%d\n", i);\
                                                         \
-    IFactory* v = sFactoryMap.valueAt(i);               \
-    float thisScore;                                    \
-    CHECK(v != NULL);                                   \
-    thisScore = v->scoreFactory(a, bestScore);          \
-    ALOGV("GET_PLAYER_TYPE_IMPL - score = %f  best = %f\n", thisScore, bestScore); \
-    if (thisScore > bestScore) {                        \
-      ret = sFactoryMap.keyAt(i);                       \
-      bestScore = thisScore;                            \
-    }                                                   \
-  }                                                     \
+    IFactory* v = sFactoryMap.valueAt(i);		\
+    float thisScore;					\
+    CHECK(v != NULL);					\
+    thisScore = v->scoreFactory(a);			\
+    ALOGD("GET_PLAYER_TYPE_IMPL -     player[%d]=%f\n", i, thisScore);	\
+    if (thisScore > bestScore) {			\
+      ret = sFactoryMap.keyAt(i);			\
+      bestScore = thisScore;				\
+      winner = i;	 			        \
+      ALOGD("GET_PLAYER_TYPE_IMPL -     new best score for %s\n", PLAYER_NAMES[ret]);	\
+    }							\
+  }							\
                                                         \
-  ALOGV("GET_PLAYER_TYPE_IMPL - best = %f\n", bestScore); \
-  if (0.0 == bestScore) {                               \
-    ALOGV("GET_PLAYER_TYPE_IMPL - Get default\n");      \
-    ret = getDefaultPlayerType();                       \
-  }                                                     \
+  if (0.0 == bestScore)                                 \
+    {				                        \
+      ALOGD("GET_PLAYER_TYPE_IMPL - no best score - get default\n");	\
+      ret = getDefaultPlayerType();			\
+    }							\
+  else                                                  \
+    {							\
+      ALOGD("GET_PLAYER_TYPE_IMPL - best score = %f\n", bestScore); \
+      ALOGD("GET_PLAYER_TYPE_IMPL - for player[%d]=%s\n", winner, PLAYER_NAMES[ret]); \
+    }							\
                                                         \
   return ret;
 
@@ -220,6 +240,10 @@ namespace android {
 
       ALOGV("StagefrightPlayerFactory::scoreFactory - Enter\n");
       
+      ALOGD("StagefrightPlayerFactory:scoreFactory - fd[%d] at {%lld=>%lld}\n", fd, offset, length);
+      ALOGD("StagefrightPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+      ALOGD("StagefrightPlayerFactory:scoreFactory - def score = 1.0\n");
+
       // Ogg vorbis?
       if (ident == 0x5367674f) // 'OggS'
 	{
@@ -245,8 +269,14 @@ namespace android {
 			       float curScore) 
     {
       static const float kOurScore = 0.8;
+      static const float kOurStreamingBonus = 0.2;
+
       ALOGV("NuPlayerFactory::scoreFactory - Enter (default score 0.8)\n");
       
+      ALOGD("NuPlayerFactory:scoreFactory - url '%s'\n", url);
+      ALOGD("NuPlayerFactory:scoreFactory - cur score = %f\n", curScore);
+      ALOGD("NuPlayerFactory:scoreFactory - def score = %f\n", kOurScore);
+
       if (kOurScore <= curScore)
 	{
 	  ALOGV("NuPlayerFactory::scoreFactory - curScore greater => scored 0.0\n");
@@ -268,18 +298,18 @@ namespace android {
 	  if (strstr(url,"m3u8")) 
 	    {
 	      ALOGV("NuPlayerFactory::scoreFactory - m3u8 playlist (HLS) => scored %f\n", kOurScore);
-	      return kOurScore;
+	      return kOurScore + kOurStreamingBonus;
 	    }
 	
 	  if (len >= 4 && !strcasecmp(".mpd", &url[len - 4])) 
 	    {
-	      ALOGV("NuPlayerFactory::scoreFactory - mpd ext manifest (DASH) => scored %f\n", kOurScore);
-	      return kOurScore;
+	      ALOGV("NuPlayerFactory::scoreFactory - mpd ext manifest (DASH) => scored %f\n", kOurScore + kOurStreamingBonus);
+	      return kOurScore + kOurStreamingBonus;
 	    }
 	
 	  if (strstr(url,"mpd")) 
 	    {
-	      ALOGV("NuPlayerFactory::scoreFactory - mpd manifest (DASH) => scored %f\n", kOurScore);
+	      ALOGV("NuPlayerFactory::scoreFactory - mpd manifest (DASH) => scored %f\n", kOurScore + kOurStreamingBonus);
 	      return kOurScore;
 	    }
 	
@@ -305,6 +335,7 @@ namespace android {
 			       float curScore) 
     {
       ALOGV("NuPlayerFactory::scoreFactory - Enter => cur score %f\n", curScore);
+      ALOGV("NuPlayerFactory::scoreFactory - Enter => scoring 1.0\n");
       return 1.0;
     }
 
