@@ -144,7 +144,7 @@ namespace android {
   {
     ALOGV("MediaPlayerFactory::getPlayerType - Enter\n");
     ALOGV("MediaPlayerFactory::getPlayerType - url = '%s'\n", url);
-    GET_PLAYER_TYPE_IMPL(client, url);
+    GET_PLAYER_TYPE_IMPL(client, url, bestScore);
   }
 
   player_type MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client,
@@ -154,7 +154,7 @@ namespace android {
   {
     ALOGV("MediaPlayerFactory::getPlayerType - Enter\n");
     ALOGV("MediaPlayerFactory::getPlayerType - fd[%d] at (%lld=>%lld)\n", fd, offset, length);
-    GET_PLAYER_TYPE_IMPL(client, fd, offset, length);
+    GET_PLAYER_TYPE_IMPL(client, fd, offset, length, bestScore);
   }
 
   player_type MediaPlayerFactory::getPlayerType(const sp<IMediaPlayer>& client,
@@ -162,7 +162,7 @@ namespace android {
   {
     ALOGV("MediaPlayerFactory::getPlayerType - Enter\n");
     ALOGV("MediaPlayerFactory::getPlayerType - IStreamSource\n");
-    GET_PLAYER_TYPE_IMPL(client, source);
+    GET_PLAYER_TYPE_IMPL(client, source, bestScore);
   }
 
 #undef GET_PLAYER_TYPE_IMPL
