@@ -23,45 +23,46 @@
 namespace android 
 {
 
- public:
   struct FragmentedMP4Parser;
   struct DashSession;
 
   struct NuPlayer::DashMpdSource : public NuPlayer::Source 
   {
-    DashMpdSource(
-            const sp<AMessage>                  &notify,
-            const char                          *url,
-            const KeyedVector<String8, String8> *headers,
-                  bool                           uidValid = false,
-                  uid_t                          uid = 0);
+    DashMpdSource(const sp<AMessage>                  &notify,
+		  const char                          *url,
+		  const KeyedVector<String8, String8> *headers,
+                        bool                           uidValid = false,
+                        uid_t                          uid = 0);
 
     virtual void prepareAsync();
     virtual void start();
 
     virtual status_t feedMoreMP4Data();
 
-    virtual status_t dequeueAccessUnit(bool audio, sp<ABuffer> *accessUnit);
+    virtual status_t dequeueAccessUnit(bool audio, 
+				       sp<ABuffer> *accessUnit);
 
     virtual status_t getDuration(int64_t *durationUs);
     virtual status_t seekTo(int64_t seekTimeUs);
 
-protected:
+  protected:
     virtual ~DashMpdSource();
 
     virtual sp<MetaData> getFormatMeta(bool audio);
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
-private:
-    enum Flags {
+  private:
+    enum Flags 
+      {
         // Don't log any URLs.
         kFlagIncognito = 1,
-    };
+      };
 
-    enum {
+    enum 
+      {
         kWhatSessionNotify,
-    };
+      };
 
     AString mURL;
     KeyedVector<String8, String8> mExtraHeaders;
@@ -77,8 +78,13 @@ private:
     void onSessionNotify(const sp<AMessage> &msg);
 
     DISALLOW_EVIL_CONSTRUCTORS(DashMpdSource);
-};
+  };
 
 }  // namespace android
 
 #endif  // DASH_SOURCE_H_
+
+// Local Variables:  
+// tab-width: 8
+// mode: C++         
+// End:              

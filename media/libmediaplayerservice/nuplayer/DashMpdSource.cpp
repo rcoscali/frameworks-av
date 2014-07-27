@@ -108,78 +108,9 @@ namespace android
     return NULL;
   };
 
-  status_t NuPlayer::DashMpdSource::feedMoreTSData() 
-  {
-    if (mFinalResult != OK)
-      return mFinalResult;
-
-    sp<DashDataSource> source =
-      static_cast<DashDataSource *>(mDashSession->getDataSource().get());
-
-    for (int32_t i = 0; i < 50; ++i) 
-      {
-	char buffer[188];
-	ssize_t n = source->readAtNonBlocking(mOffset, buffer, sizeof(buffer));
-	
-      if (n == -EWOULDBLOCK)
-	break;
-
-      else if (n < 0) 
-	{
-	  if (n != ERROR_END_OF_STREAM)
-	    ALOGI("input data EOS reached, error %ld", n);
-	  else
-	    ALOGI("input data EOS reached.");
-	  
-	  mTSParser->signalEOS(n);
-	  mFinalResult = n;
-	  break;
-	} 
-      else 
-	{
-	  if (buffer[0] == 0x00) 
-	    {
-	      // XXX legacy
-	      
-	      uint8_t type = buffer[1];
-	      
-	      sp<AMessage> extra = new AMessage;
-	      
-	      if (type & 2) 
-		{
-		  int64_t mediaTimeUs;
-		  memcpy(&mediaTimeUs, &buffer[2], sizeof(mediaTimeUs));
-		  
-		  extra->setInt64(IStreamListener::kKeyMediaTimeUs, mediaTimeUs);
-		}
-	      
-	      mTSParser->signalDiscontinuity(((type & 1) == 0)
-					     ? ATSParser::DISCONTINUITY_SEEK
-					     : ATSParser::DISCONTINUITY_FORMATCHANGE,
-					     extra);
-	    } 
-	  else 
-	    {
-	      status_t err = mTSParser->feedTSPacket(buffer, sizeof(buffer));
-	      
-	      if (err != OK) 
-		{
-		  ALOGE("TS Parser returned error %d", err);
-		  mTSParser->signalEOS(err);
-		  mFinalResult = err;
-		  break;
-		}
-	    }
-	  
-	  mOffset += n;
-	}
-      }
-    
-    return OK;
-  };
-
   status_t NuPlayer::DashMpdSource::dequeueAccessUnit(bool audio, sp<ABuffer> *accessUnit) 
   {
+    /*
     ATSParser::SourceType type =
       audio ? ATSParser::AUDIO : ATSParser::VIDEO;
     
@@ -194,6 +125,8 @@ namespace android
       return finalResult == OK ? -EWOULDBLOCK : finalResult;
 
     return source->dequeueAccessUnit(accessUnit);
+    */
+    return -EWOULDBLOCK;
   };
 
   status_t NuPlayer::DashMpdSource::getDuration(int64_t *durationUs) 
@@ -203,13 +136,6 @@ namespace android
 
   status_t NuPlayer::DashMpdSource::seekTo(int64_t seekTimeUs) 
   {
-    // We need to make sure we're not seeking until we have seen the very first
-    // PTS timestamp in the whole stream (from the beginning of the stream).
-    while (!mTSParser->PTSTimeDeltaEstablished() && feedMoreTSData() == OK)
-      usleep(100000);
-
-    mDashSession->seekTo(seekTimeUs);
-    
     return OK;
   };
 

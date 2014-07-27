@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "NuPlayerRenderer"
 #include <utils/Log.h>
 
@@ -392,6 +392,8 @@ void NuPlayer::Renderer::onDrainVideoQueue() {
         ALOGV("video late by %lld us (%.2f secs)",
              mVideoLateByUs, mVideoLateByUs / 1E6);
     } else {
+        int64_t mediaTimeUs;
+        CHECK(entry->mBuffer->meta()->findInt64("timeUs", &mediaTimeUs));
         ALOGV("rendering video at media time %.2f secs", mediaTimeUs / 1E6);
     }
 
