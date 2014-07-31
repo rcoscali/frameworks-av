@@ -206,11 +206,13 @@ namespace android {
       (CreateCryptoFactoryFunc)mLibrary->lookup("createCryptoFactory");
 
     if (createCryptoFactory == NULL ||
-        (mFactory = createCryptoFactory()) == NULL ||
-        !mFactory->isCryptoSchemeSupported(uuid)) {
-      ALOGV("Crypto::loadLibraryForScheme - Factory not available");
-      closeFactory();
-      return false;
+        (mFactory = createCryptoFactory()) == NULL) {
+      ALOGV("Crypto::loadLibraryForScheme - Factory available\n");
+      if (!mFactory->isCryptoSchemeSupported(uuid)) {
+        ALOGV("Crypto::loadLibraryForScheme - Scheme not supported\n");
+        closeFactory();
+        return false;
+      }
     }
 
     ALOGV("Crypto::loadLibraryForScheme - Plugin for scheme '%02x%02x%02x%02x"
